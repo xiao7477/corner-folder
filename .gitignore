@@ -1,0 +1,18 @@
+.DS_Store
+
+# Swift build output
+.build/
+.swiftpm/
+app/FolderQuick/.build-cache/
+app/FolderQuick/.build-home/
+app/FolderQuick/.clang-module-cache/
+app/FolderQuick/build/
+
+# Local alternate git metadata used when .git creation is blocked
+git-data/
+
+# Xcode user files
+*.xcuserstate
+xcuserdata/
+DerivedData/
+
