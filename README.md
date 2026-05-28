@@ -52,13 +52,28 @@ Folder_Quick/
 
 ## 运行方式
 
-进入 `app/FolderQuick` 后运行构建脚本：
+现在有两种构建方式。
+
+推荐使用 Xcode 构建：
+
+```bash
+cd /Users/xiao-mbp2023/CodeSpace/Folder_Quick/app/FolderQuick
+./build_xcode.sh
+```
+
+构建完成后应用在：
+
+```text
+app/FolderQuick/build/XcodeDerived/Build/Products/Debug/FolderQuick.app
+```
+
+也可以继续使用命令行 Swift 构建：
 
 ```bash
 ./build_app.sh
 ```
 
-构建完成后打开：
+构建完成后应用在：
 
 ```text
 app/FolderQuick/build/FolderQuick.app

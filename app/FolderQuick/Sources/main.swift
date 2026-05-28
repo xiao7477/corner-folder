@@ -1,19 +1,10 @@
 import AppKit
 
-@main
 final class FolderQuickApp: NSObject, NSApplicationDelegate {
     private var controller: SidebarWindowController?
     private var statusItem: NSStatusItem?
     private var hotkey: GlobalHotkey?
     private var statusMenu: NSMenu?
-
-    static func main() {
-        let app = NSApplication.shared
-        let delegate = FolderQuickApp()
-        app.delegate = delegate
-        app.setActivationPolicy(.accessory)
-        app.run()
-    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = SidebarWindowController()
@@ -65,3 +56,9 @@ final class FolderQuickApp: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 }
+
+let app = NSApplication.shared
+let delegate = FolderQuickApp()
+app.delegate = delegate
+app.setActivationPolicy(.accessory)
+app.run()

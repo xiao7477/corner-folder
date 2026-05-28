@@ -30,7 +30,19 @@
 
 ## 如何运行
 
-在项目的 `app/FolderQuick` 目录里运行构建脚本，会生成：
+推荐在项目的 `app/FolderQuick` 目录里运行 Xcode 构建脚本：
+
+```text
+./build_xcode.sh
+```
+
+会生成：
+
+```text
+app/FolderQuick/build/XcodeDerived/Build/Products/Debug/FolderQuick.app
+```
+
+也可以运行旧的命令行构建脚本：
 
 ```text
 app/FolderQuick/build/FolderQuick.app

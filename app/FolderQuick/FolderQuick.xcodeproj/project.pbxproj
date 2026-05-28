@@ -1,0 +1,298 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		20A100000000000000000001 /* EdgeTriggerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000001 /* EdgeTriggerView.swift */; };
+		20A100000000000000000002 /* FileItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000002 /* FileItemView.swift */; };
+		20A100000000000000000003 /* FileLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000003 /* FileLoader.swift */; };
+		20A100000000000000000004 /* FolderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000004 /* FolderStore.swift */; };
+		20A100000000000000000005 /* GlobalHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000005 /* GlobalHotkey.swift */; };
+		20A100000000000000000006 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000006 /* Models.swift */; };
+		20A100000000000000000007 /* SettingsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000007 /* SettingsPanel.swift */; };
+		20A100000000000000000008 /* SidebarWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000008 /* SidebarWindowController.swift */; };
+		20A100000000000000000009 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000009 /* main.swift */; };
+		20A100000000000000000010 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000010 /* AppKit.framework */; };
+		20A100000000000000000011 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000011 /* Quartz.framework */; };
+		20A100000000000000000012 /* QuickLookThumbnailing.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000012 /* QuickLookThumbnailing.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		20A000000000000000000001 /* EdgeTriggerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeTriggerView.swift; sourceTree = "<group>"; };
+		20A000000000000000000002 /* FileItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemView.swift; sourceTree = "<group>"; };
+		20A000000000000000000003 /* FileLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileLoader.swift; sourceTree = "<group>"; };
+		20A000000000000000000004 /* FolderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderStore.swift; sourceTree = "<group>"; };
+		20A000000000000000000005 /* GlobalHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkey.swift; sourceTree = "<group>"; };
+		20A000000000000000000006 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		20A000000000000000000007 /* SettingsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPanel.swift; sourceTree = "<group>"; };
+		20A000000000000000000008 /* SidebarWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarWindowController.swift; sourceTree = "<group>"; };
+		20A000000000000000000009 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		20A000000000000000000010 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		20A000000000000000000011 /* Quartz.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Quartz.framework; path = System/Library/Frameworks/Quartz.framework; sourceTree = SDKROOT; };
+		20A000000000000000000012 /* QuickLookThumbnailing.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLookThumbnailing.framework; path = System/Library/Frameworks/QuickLookThumbnailing.framework; sourceTree = SDKROOT; };
+		20A000000000000000000013 /* FolderQuick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FolderQuick.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		20A000000000000000000014 /* AppInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = AppInfo.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		20A200000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				20A100000000000000000010 /* AppKit.framework in Frameworks */,
+				20A100000000000000000011 /* Quartz.framework in Frameworks */,
+				20A100000000000000000012 /* QuickLookThumbnailing.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		20A300000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				20A300000000000000000002 /* Sources */,
+				20A300000000000000000003 /* Frameworks */,
+				20A300000000000000000004 /* Products */,
+				20A000000000000000000014 /* AppInfo.plist */,
+			);
+			sourceTree = "<group>";
+		};
+		20A300000000000000000002 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				20A000000000000000000001 /* EdgeTriggerView.swift */,
+				20A000000000000000000002 /* FileItemView.swift */,
+				20A000000000000000000003 /* FileLoader.swift */,
+				20A000000000000000000004 /* FolderStore.swift */,
+				20A000000000000000000005 /* GlobalHotkey.swift */,
+				20A000000000000000000006 /* Models.swift */,
+				20A000000000000000000007 /* SettingsPanel.swift */,
+				20A000000000000000000008 /* SidebarWindowController.swift */,
+				20A000000000000000000009 /* main.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		20A300000000000000000003 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				20A000000000000000000010 /* AppKit.framework */,
+				20A000000000000000000011 /* Quartz.framework */,
+				20A000000000000000000012 /* QuickLookThumbnailing.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		20A300000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				20A000000000000000000013 /* FolderQuick.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		20A400000000000000000001 /* FolderQuick */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 20A900000000000000000002 /* Build configuration list for PBXNativeTarget "FolderQuick" */;
+			buildPhases = (
+				20A500000000000000000001 /* Sources */,
+				20A200000000000000000001 /* Frameworks */,
+				20A600000000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FolderQuick;
+			productName = FolderQuick;
+			productReference = 20A000000000000000000013 /* FolderQuick.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		20A700000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2605;
+				LastUpgradeCheck = 2605;
+				TargetAttributes = {
+					20A400000000000000000001 = {
+						CreatedOnToolsVersion = 26.5;
+					};
+				};
+			};
+			buildConfigurationList = 20A900000000000000000001 /* Build configuration list for PBXProject "FolderQuick" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = zh_CN;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				zh_CN,
+				Base,
+			);
+			mainGroup = 20A300000000000000000001;
+			productRefGroup = 20A300000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				20A400000000000000000001 /* FolderQuick */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		20A600000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		20A500000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				20A100000000000000000001 /* EdgeTriggerView.swift in Sources */,
+				20A100000000000000000002 /* FileItemView.swift in Sources */,
+				20A100000000000000000003 /* FileLoader.swift in Sources */,
+				20A100000000000000000004 /* FolderStore.swift in Sources */,
+				20A100000000000000000005 /* GlobalHotkey.swift in Sources */,
+				20A100000000000000000006 /* Models.swift in Sources */,
+				20A100000000000000000007 /* SettingsPanel.swift in Sources */,
+				20A100000000000000000008 /* SidebarWindowController.swift in Sources */,
+				20A100000000000000000009 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		20A800000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		20A800000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		20A800000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AppInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = local.folderquick.mvp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		20A800000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AppInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = local.folderquick.mvp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		20A900000000000000000001 /* Build configuration list for PBXProject "FolderQuick" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				20A800000000000000000001 /* Debug */,
+				20A800000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		20A900000000000000000002 /* Build configuration list for PBXNativeTarget "FolderQuick" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				20A800000000000000000003 /* Debug */,
+				20A800000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 20A700000000000000000001 /* Project object */;
+}

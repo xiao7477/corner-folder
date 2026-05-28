@@ -12,6 +12,13 @@
 - 图标大小设置会影响网格尺寸和缩略图尺寸。
 - 构建脚本会生成应用图标 PNG 源，并在系统允许时生成 `.icns`。
 
+## 0.3.0
+
+- 新增标准 Xcode 工程 `FolderQuick.xcodeproj`。
+- 新增 Xcode 构建脚本 `build_xcode.sh`。
+- Xcode Debug 构建会输出标准 `.app` 到 `build/XcodeDerived/Build/Products/Debug/FolderQuick.app`。
+- 保留原来的命令行 Swift 构建脚本，方便快速验证。
+
 ## 0.1.0
 
 - 完成侧边悬浮窗口。
