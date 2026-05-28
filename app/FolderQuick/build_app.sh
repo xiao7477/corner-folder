@@ -7,6 +7,7 @@ APP_DIR="$BUILD_DIR/FolderQuick.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
+PYTHON="/Users/xiao-mbp2023/CodeSpace/MyTools/venv/bin/python3"
 
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$ROOT_DIR/.clang-module-cache"
 
@@ -32,6 +33,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <string>6.0</string>
   <key>CFBundleName</key>
   <string>FolderQuick</string>
+  <key>CFBundleIconFile</key>
+  <string>FolderQuick</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -45,6 +48,14 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+
+"$PYTHON" "$ROOT_DIR/Tools/create_icon.py" "$BUILD_DIR/FolderQuick.iconset"
+cp "$BUILD_DIR/FolderQuick.iconset/icon_512x512@2x.png" "$RESOURCES_DIR/FolderQuick.png"
+if iconutil -c icns "$BUILD_DIR/FolderQuick.iconset" -o "$RESOURCES_DIR/FolderQuick.icns" 2>/dev/null; then
+  true
+else
+  echo "warning: iconutil could not create FolderQuick.icns; kept FolderQuick.png as the icon source."
+fi
 
 printf "APPL????" > "$CONTENTS_DIR/PkgInfo"
 codesign --force --deep --sign - "$APP_DIR" >/dev/null

@@ -6,6 +6,8 @@ final class FileItemView: NSCollectionViewItem {
 
     private let thumbnailView = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
+    private var thumbnailWidthConstraint: NSLayoutConstraint?
+    private var thumbnailHeightConstraint: NSLayoutConstraint?
     private var representedURL: URL?
 
     override func loadView() {
@@ -28,11 +30,14 @@ final class FileItemView: NSCollectionViewItem {
         view.addSubview(thumbnailView)
         view.addSubview(titleLabel)
 
+        thumbnailWidthConstraint = thumbnailView.widthAnchor.constraint(equalToConstant: 80)
+        thumbnailHeightConstraint = thumbnailView.heightAnchor.constraint(equalToConstant: 70)
+
         NSLayoutConstraint.activate([
             thumbnailView.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
             thumbnailView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            thumbnailView.widthAnchor.constraint(equalToConstant: 80),
-            thumbnailView.heightAnchor.constraint(equalToConstant: 70),
+            thumbnailWidthConstraint!,
+            thumbnailHeightConstraint!,
             titleLabel.topAnchor.constraint(equalTo: thumbnailView.bottomAnchor, constant: 10),
             titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 6),
             titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -6)
@@ -45,9 +50,13 @@ final class FileItemView: NSCollectionViewItem {
         }
     }
 
-    func configure(with entry: FileEntry) {
+    func configure(with entry: FileEntry, iconSize: Double) {
         representedURL = entry.url
         titleLabel.stringValue = entry.name
+        let thumbnailSize = max(66, min(112, iconSize * 0.62))
+        thumbnailWidthConstraint?.constant = thumbnailSize
+        thumbnailHeightConstraint?.constant = thumbnailSize * 0.88
+        titleLabel.font = .systemFont(ofSize: iconSize >= 150 ? 14 : 13, weight: .medium)
         thumbnailView.image = fallbackIcon(for: entry)
         loadThumbnail(for: entry)
     }

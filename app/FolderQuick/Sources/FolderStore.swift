@@ -5,6 +5,7 @@ final class FolderStore {
 
     private let foldersKey = "folderquick.folders"
     private let selectedFolderKey = "folderquick.selectedFolder"
+    private let settingsKey = "folderquick.settings"
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
 
@@ -30,6 +31,19 @@ final class FolderStore {
 
     func saveSelectedFolderID(_ id: UUID?) {
         UserDefaults.standard.set(id?.uuidString, forKey: selectedFolderKey)
+    }
+
+    func loadSettings() -> AppSettings {
+        guard let data = UserDefaults.standard.data(forKey: settingsKey),
+              let settings = try? decoder.decode(AppSettings.self, from: data) else {
+            return AppSettings()
+        }
+        return settings
+    }
+
+    func saveSettings(_ settings: AppSettings) {
+        guard let data = try? encoder.encode(settings) else { return }
+        UserDefaults.standard.set(data, forKey: settingsKey)
     }
 
     func bookmark(for url: URL) throws -> Data {

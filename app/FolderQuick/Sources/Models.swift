@@ -10,6 +10,21 @@ enum FileKind: String, CaseIterable {
     case other = "其他"
 }
 
+enum SidebarPosition: String, Codable, CaseIterable {
+    case right = "右侧"
+    case left = "左侧"
+}
+
+struct AppSettings: Codable, Equatable {
+    var sidebarPosition: SidebarPosition = .right
+    var windowWidth: Double = 780
+    var windowHeight: Double = 720
+    var opacity: Double = 0.96
+    var iconSize: Double = 132
+    var showEdgeTrigger: Bool = false
+    var autoHideDelay: Double = 0.35
+}
+
 struct FolderEntry: Codable, Equatable {
     let id: UUID
     var name: String

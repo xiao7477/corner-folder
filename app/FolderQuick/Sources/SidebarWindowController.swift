@@ -4,12 +4,16 @@ import Quartz
 final class SidebarWindowController: NSObject {
     private let store = FolderStore.shared
     private let loader = FileLoader()
-    private let settingsPanel = SettingsPanel()
+    private var settings: AppSettings
+    private lazy var settingsPanel = SettingsPanel(settings: settings)
 
     private var panel: NSPanel!
     private var edgePanel: NSPanel!
     private var rootView = NSVisualEffectView()
     private var backButton = NSButton()
+    private var rootButton = NSButton()
+    private var refreshButton = NSButton()
+    private var previewButton = NSButton()
     private var folderButton = NSPopUpButton()
     private var tabScrollView = NSScrollView()
     private var tabStack = NSStackView()
@@ -21,11 +25,15 @@ final class SidebarWindowController: NSObject {
     private var collectionView = NSCollectionView()
     private var scrollView = NSScrollView()
     private var countLabel = NSTextField(labelWithString: "0 项")
+    private var pathLabel = NSTextField(labelWithString: "未选择文件夹")
     private var settingsButton = NSButton()
     private var emptyLabel = NSTextField(labelWithString: "添加一个常用文件夹后开始使用")
+    private var hideWorkItem: DispatchWorkItem?
+    private var keyMonitor: Any?
 
     private var folders: [FolderEntry] = []
     private var selectedFolderID: UUID?
+    private var selectedRootURL: URL?
     private var currentFolderURL: URL?
     private var navigationStack: [URL] = []
     private var allFiles: [FileEntry] = []
@@ -33,14 +41,25 @@ final class SidebarWindowController: NSObject {
     private var isPinned = false
 
     override init() {
+        settings = store.loadSettings()
         super.init()
         folders = store.loadFolders()
         selectedFolderID = store.selectedFolderID() ?? folders.first?.id
         buildWindow()
         buildEdgeTrigger()
         buildInterface()
+        settingsPanel.onSettingsChanged = { [weak self] settings in
+            self?.applySettings(settings)
+        }
+        installKeyMonitor()
         reloadFolderMenu()
         loadSelectedFolder()
+    }
+
+    deinit {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+        }
     }
 
     func showWindow() {
@@ -51,15 +70,19 @@ final class SidebarWindowController: NSObject {
 
     func toggleWindow() {
         if panel.isVisible {
-            panel.orderOut(nil)
+            hideWindow()
         } else {
             showWindow()
         }
     }
 
+    private func hideWindow() {
+        panel.orderOut(nil)
+    }
+
     private func buildWindow() {
         panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 780, height: 720),
+            contentRect: NSRect(x: 0, y: 0, width: settings.windowWidth, height: settings.windowHeight),
             styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .resizable],
             backing: .buffered,
             defer: false
@@ -73,10 +96,25 @@ final class SidebarWindowController: NSObject {
         panel.isReleasedWhenClosed = false
         panel.backgroundColor = .clear
         panel.isOpaque = false
+        panel.alphaValue = settings.opacity
         panel.delegate = self
         panel.standardWindowButton(.closeButton)?.isHidden = true
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
+    }
+
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
+        true
+    }
+
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        panel.dataSource = self
+        panel.delegate = self
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        panel.dataSource = nil
+        panel.delegate = nil
     }
 
     private func buildEdgeTrigger() {
@@ -88,7 +126,7 @@ final class SidebarWindowController: NSObject {
         )
         edgePanel.level = .floating
         edgePanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        edgePanel.backgroundColor = .clear
+        edgePanel.backgroundColor = settings.showEdgeTrigger ? NSColor.controlAccentColor.withAlphaComponent(0.18) : .clear
         edgePanel.isOpaque = false
         edgePanel.hasShadow = false
         edgePanel.ignoresMouseEvents = false
@@ -128,6 +166,7 @@ final class SidebarWindowController: NSObject {
 
         mainStack.addArrangedSubview(makeTopBar())
         mainStack.addArrangedSubview(makeTabBar())
+        mainStack.addArrangedSubview(makePathBar())
         mainStack.addArrangedSubview(makeFilterBar())
         mainStack.addArrangedSubview(makeContentView())
         mainStack.addArrangedSubview(makeBottomBar())
@@ -143,10 +182,13 @@ final class SidebarWindowController: NSObject {
         folderButton.action = #selector(folderChanged)
 
         backButton = iconButton("chevron.left", action: #selector(goBack))
+        rootButton = iconButton("house", action: #selector(goRoot))
+        refreshButton = iconButton("arrow.clockwise", action: #selector(refreshFiles))
+        previewButton = iconButton("eye", action: #selector(previewSelected))
         addButton = iconButton("folder.badge.plus", action: #selector(addFolder))
         pinButton = iconButton("pin", action: #selector(togglePin))
 
-        let stack = NSStackView(views: [backButton, folderButton, addButton, pinButton])
+        let stack = NSStackView(views: [backButton, rootButton, refreshButton, previewButton, folderButton, addButton, pinButton])
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 12
@@ -157,6 +199,27 @@ final class SidebarWindowController: NSObject {
             stack.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 22),
             stack.trailingAnchor.constraint(lessThanOrEqualTo: bar.trailingAnchor, constant: -22),
             stack.centerYAnchor.constraint(equalTo: bar.centerYAnchor)
+        ])
+
+        return bar
+    }
+
+    private func makePathBar() -> NSView {
+        let bar = NSView()
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        bar.heightAnchor.constraint(equalToConstant: 34).isActive = true
+
+        pathLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        pathLabel.textColor = .secondaryLabelColor
+        pathLabel.lineBreakMode = .byTruncatingMiddle
+        pathLabel.maximumNumberOfLines = 1
+        pathLabel.translatesAutoresizingMaskIntoConstraints = false
+        bar.addSubview(pathLabel)
+
+        NSLayoutConstraint.activate([
+            pathLabel.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 24),
+            pathLabel.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -24),
+            pathLabel.centerYAnchor.constraint(equalTo: bar.centerYAnchor)
         ])
 
         return bar
@@ -198,6 +261,7 @@ final class SidebarWindowController: NSObject {
         searchField.target = self
         searchField.action = #selector(applyFilters)
         searchField.sendsSearchStringImmediately = true
+        searchField.delegate = self
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.widthAnchor.constraint(equalToConstant: 210).isActive = true
 
@@ -230,7 +294,7 @@ final class SidebarWindowController: NSObject {
         container.translatesAutoresizingMaskIntoConstraints = false
 
         let layout = NSCollectionViewFlowLayout()
-        layout.itemSize = NSSize(width: 132, height: 138)
+        layout.itemSize = itemSize()
         layout.sectionInset = NSEdgeInsets(top: 24, left: 34, bottom: 24, right: 34)
         layout.minimumInteritemSpacing = 26
         layout.minimumLineSpacing = 38
@@ -312,7 +376,13 @@ final class SidebarWindowController: NSObject {
         let visible = screen.visibleFrame
         let width = min(panel.frame.width, visible.width * 0.72)
         let height = min(panel.frame.height, visible.height * 0.86)
-        let x = visible.maxX - width - 18
+        let x: Double
+        switch settings.sidebarPosition {
+        case .right:
+            x = visible.maxX - width - 18
+        case .left:
+            x = visible.minX + 18
+        }
         let y = visible.midY - height / 2
         panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
         positionEdgeTrigger()
@@ -321,8 +391,15 @@ final class SidebarWindowController: NSObject {
     private func positionEdgeTrigger() {
         guard let screen = NSScreen.main else { return }
         let visible = screen.visibleFrame
+        let x: Double
+        switch settings.sidebarPosition {
+        case .right:
+            x = visible.maxX - 2
+        case .left:
+            x = visible.minX - 6
+        }
         edgePanel?.setFrame(
-            NSRect(x: visible.maxX - 2, y: visible.midY - 210, width: 8, height: 420),
+            NSRect(x: x, y: visible.midY - 210, width: 8, height: 420),
             display: true
         )
     }
@@ -376,30 +453,67 @@ final class SidebarWindowController: NSObject {
         guard let selectedFolderID,
               let folder = folders.first(where: { $0.id == selectedFolderID }),
               let url = store.resolve(folder) else {
+            selectedRootURL = nil
             currentFolderURL = nil
             allFiles = []
             shownFiles = []
+            pathLabel.stringValue = folders.isEmpty ? "未选择文件夹" : "文件夹权限失效，请重新添加"
             refreshCollection()
             return
         }
 
+        selectedRootURL = url
         currentFolderURL = url
         navigationStack = []
-        allFiles = loader.loadFiles(in: url)
+        reloadFiles(from: url)
         reloadTabs()
         applyFilters()
     }
 
     private func refreshCollection() {
-        emptyLabel.isHidden = !shownFiles.isEmpty || !folders.isEmpty
+        emptyLabel.isHidden = !shownFiles.isEmpty || (!folders.isEmpty && !allFiles.isEmpty)
         if folders.isEmpty {
             emptyLabel.stringValue = "添加一个常用文件夹后开始使用"
+        } else if allFiles.isEmpty {
+            emptyLabel.stringValue = "这个文件夹是空的，或暂时没有读取权限"
         } else if shownFiles.isEmpty {
             emptyLabel.stringValue = "没有找到匹配的文件"
         }
         countLabel.stringValue = "\(shownFiles.count) 项"
         backButton.isEnabled = !navigationStack.isEmpty
+        rootButton.isEnabled = currentFolderURL != nil && currentFolderURL != selectedRootURL
+        refreshButton.isEnabled = currentFolderURL != nil
+        previewButton.isEnabled = selectedPreviewURL() != nil
+        updatePathLabel()
         collectionView.reloadData()
+    }
+
+    private func reloadFiles(from url: URL) {
+        allFiles = loader.loadFiles(in: url)
+    }
+
+    private func updatePathLabel() {
+        guard let currentFolderURL else {
+            pathLabel.stringValue = "未选择文件夹"
+            return
+        }
+
+        if let selectedRootURL, currentFolderURL == selectedRootURL {
+            pathLabel.stringValue = currentFolderURL.lastPathComponent
+        } else {
+            pathLabel.stringValue = currentFolderURL.path
+        }
+    }
+
+    private func itemSize() -> NSSize {
+        let width = settings.iconSize
+        return NSSize(width: width, height: width + 8)
+    }
+
+    private func applyItemSize() {
+        guard let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout else { return }
+        layout.itemSize = itemSize()
+        layout.invalidateLayout()
     }
 
     @objc private func addFolder() {
@@ -455,11 +569,26 @@ final class SidebarWindowController: NSObject {
     @objc private func goBack() {
         guard let previous = navigationStack.popLast() else { return }
         currentFolderURL = previous
-        allFiles = loader.loadFiles(in: previous)
+        reloadFiles(from: previous)
+        applyFilters()
+    }
+
+    @objc private func goRoot() {
+        guard let selectedRootURL else { return }
+        currentFolderURL = selectedRootURL
+        navigationStack = []
+        reloadFiles(from: selectedRootURL)
+        applyFilters()
+    }
+
+    @objc private func refreshFiles() {
+        guard let currentFolderURL else { return }
+        reloadFiles(from: currentFolderURL)
         applyFilters()
     }
 
     @objc private func openSettings() {
+        settingsPanel.update(settings: settings)
         settingsPanel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -477,6 +606,47 @@ final class SidebarWindowController: NSObject {
         }
 
         refreshCollection()
+    }
+
+    private func installKeyMonitor() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.panel.isVisible else { return event }
+            if event.keyCode == 49 {
+                self.previewSelected()
+                return nil
+            }
+            if event.keyCode == 53 {
+                self.hideWindow()
+                return nil
+            }
+            return event
+        }
+    }
+
+    private func selectedPreviewURL() -> URL? {
+        guard let indexPath = collectionView.selectionIndexPaths.first else { return nil }
+        guard shownFiles.indices.contains(indexPath.item) else { return nil }
+        let entry = shownFiles[indexPath.item]
+        return entry.isDirectory ? nil : entry.url
+    }
+
+    @objc private func previewSelected() {
+        guard selectedPreviewURL() != nil else { return }
+        if let panel = QLPreviewPanel.shared() {
+            panel.dataSource = self
+            panel.delegate = self
+            panel.reloadData()
+            panel.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    private func applySettings(_ newSettings: AppSettings) {
+        settings = newSettings
+        store.saveSettings(settings)
+        panel.alphaValue = settings.opacity
+        edgePanel.backgroundColor = settings.showEdgeTrigger ? NSColor.controlAccentColor.withAlphaComponent(0.18) : .clear
+        applyItemSize()
+        positionPanel()
     }
 
     private func matchesTimeFilter(_ date: Date?, title: String) -> Bool {
@@ -511,8 +681,20 @@ final class SidebarWindowController: NSObject {
 extension SidebarWindowController: NSWindowDelegate {
     func windowDidResignKey(_ notification: Notification) {
         if !isPinned {
-            panel.orderOut(nil)
+            hideWorkItem?.cancel()
+            let workItem = DispatchWorkItem { [weak self] in
+                self?.hideWindow()
+            }
+            hideWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + settings.autoHideDelay, execute: workItem)
         }
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        guard notification.object as AnyObject? === panel else { return }
+        settings.windowWidth = panel.frame.width
+        settings.windowHeight = panel.frame.height
+        store.saveSettings(settings)
     }
 }
 
@@ -524,12 +706,13 @@ extension SidebarWindowController: NSCollectionViewDataSource, NSCollectionViewD
     func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
         let item = collectionView.makeItem(withIdentifier: FileItemView.identifier, for: indexPath)
         if let fileItem = item as? FileItemView {
-            fileItem.configure(with: shownFiles[indexPath.item])
+            fileItem.configure(with: shownFiles[indexPath.item], iconSize: settings.iconSize)
         }
         return item
     }
 
     func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
+        previewButton.isEnabled = selectedPreviewURL() != nil
         guard let event = NSApp.currentEvent, event.clickCount == 2, let indexPath = indexPaths.first else { return }
         let entry = shownFiles[indexPath.item]
         if entry.isDirectory {
@@ -537,7 +720,7 @@ extension SidebarWindowController: NSCollectionViewDataSource, NSCollectionViewD
                 navigationStack.append(currentFolderURL)
             }
             currentFolderURL = entry.url
-            allFiles = loader.loadFiles(in: entry.url)
+            reloadFiles(from: entry.url)
             applyFilters()
         } else {
             NSWorkspace.shared.open(entry.url)
@@ -579,5 +762,22 @@ extension SidebarWindowController: NSCollectionViewDataSource, NSCollectionViewD
     @objc private func revealMenuItem(_ sender: NSMenuItem) {
         guard let url = sender.representedObject as? URL else { return }
         NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+}
+
+extension SidebarWindowController: QLPreviewPanelDataSource, QLPreviewPanelDelegate {
+    func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+        selectedPreviewURL() == nil ? 0 : 1
+    }
+
+    func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
+        selectedPreviewURL() as NSURL?
+    }
+
+}
+
+extension SidebarWindowController: NSSearchFieldDelegate {
+    func controlTextDidChange(_ obj: Notification) {
+        applyFilters()
     }
 }
