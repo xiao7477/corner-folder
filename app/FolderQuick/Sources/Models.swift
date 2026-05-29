@@ -10,19 +10,35 @@ enum FileKind: String, CaseIterable {
     case other = "其他"
 }
 
-enum SidebarPosition: String, Codable, CaseIterable {
+enum WindowAnchor: String, Codable, CaseIterable {
     case right = "右侧"
     case left = "左侧"
+    case top = "上方"
+    case bottom = "下方"
+    case topLeft = "左上角"
+    case topRight = "右上角"
+    case bottomLeft = "左下角"
+    case bottomRight = "右下角"
+}
+
+enum FileViewMode: String, Codable, CaseIterable {
+    case grid = "图标"
+    case list = "列表"
 }
 
 struct AppSettings: Codable, Equatable {
-    var sidebarPosition: SidebarPosition = .right
+    var sidebarPosition: WindowAnchor = .right
+    var triggerPositions: [WindowAnchor] = [.right]
     var windowWidth: Double = 780
     var windowHeight: Double = 720
     var opacity: Double = 0.96
-    var iconSize: Double = 132
+    var iconSize: Double = 96
+    var iconSpacing: Double = 12
+    var edgeTriggerEnabled: Bool = true
     var showEdgeTrigger: Bool = false
+    var showBottomPath: Bool = true
     var autoHideDelay: Double = 0.35
+    var viewMode: FileViewMode = .grid
 }
 
 struct FolderEntry: Codable, Equatable {

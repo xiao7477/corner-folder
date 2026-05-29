@@ -6,6 +6,7 @@ final class FileItemView: NSCollectionViewItem {
 
     private let thumbnailView = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
+    private let selectionView = NSView()
     private var thumbnailWidthConstraint: NSLayoutConstraint?
     private var thumbnailHeightConstraint: NSLayoutConstraint?
     private var representedURL: URL?
@@ -13,7 +14,11 @@ final class FileItemView: NSCollectionViewItem {
     override func loadView() {
         view = NSView(frame: NSRect(x: 0, y: 0, width: 132, height: 138))
         view.wantsLayer = true
-        view.layer?.cornerRadius = 8
+
+        selectionView.translatesAutoresizingMaskIntoConstraints = false
+        selectionView.wantsLayer = true
+        selectionView.layer?.cornerRadius = 8
+        selectionView.layer?.backgroundColor = NSColor.clear.cgColor
 
         thumbnailView.translatesAutoresizingMaskIntoConstraints = false
         thumbnailView.imageScaling = .scaleProportionallyUpOrDown
@@ -27,36 +32,42 @@ final class FileItemView: NSCollectionViewItem {
         titleLabel.font = .systemFont(ofSize: 13, weight: .medium)
         titleLabel.textColor = .labelColor
 
-        view.addSubview(thumbnailView)
-        view.addSubview(titleLabel)
+        view.addSubview(selectionView)
+        selectionView.addSubview(thumbnailView)
+        selectionView.addSubview(titleLabel)
 
         thumbnailWidthConstraint = thumbnailView.widthAnchor.constraint(equalToConstant: 80)
         thumbnailHeightConstraint = thumbnailView.heightAnchor.constraint(equalToConstant: 70)
 
         NSLayoutConstraint.activate([
-            thumbnailView.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
-            thumbnailView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            selectionView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            selectionView.topAnchor.constraint(equalTo: view.topAnchor, constant: 2),
+            selectionView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.86),
+            selectionView.bottomAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+
+            thumbnailView.topAnchor.constraint(equalTo: selectionView.topAnchor, constant: 8),
+            thumbnailView.centerXAnchor.constraint(equalTo: selectionView.centerXAnchor),
             thumbnailWidthConstraint!,
             thumbnailHeightConstraint!,
             titleLabel.topAnchor.constraint(equalTo: thumbnailView.bottomAnchor, constant: 10),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 6),
-            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -6)
+            titleLabel.leadingAnchor.constraint(equalTo: selectionView.leadingAnchor, constant: 6),
+            titleLabel.trailingAnchor.constraint(equalTo: selectionView.trailingAnchor, constant: -6)
         ])
     }
 
     override var isSelected: Bool {
         didSet {
-            view.layer?.backgroundColor = isSelected ? NSColor.controlAccentColor.withAlphaComponent(0.22).cgColor : NSColor.clear.cgColor
+            selectionView.layer?.backgroundColor = isSelected ? NSColor.controlAccentColor.withAlphaComponent(0.24).cgColor : NSColor.clear.cgColor
         }
     }
 
     func configure(with entry: FileEntry, iconSize: Double) {
         representedURL = entry.url
         titleLabel.stringValue = entry.name
-        let thumbnailSize = max(66, min(112, iconSize * 0.62))
+        let thumbnailSize = max(34, min(iconSize * 0.78, iconSize - 12))
         thumbnailWidthConstraint?.constant = thumbnailSize
-        thumbnailHeightConstraint?.constant = thumbnailSize * 0.88
-        titleLabel.font = .systemFont(ofSize: iconSize >= 150 ? 14 : 13, weight: .medium)
+        thumbnailHeightConstraint?.constant = thumbnailSize * 0.9
+        titleLabel.font = .systemFont(ofSize: iconSize < 76 ? 11 : (iconSize >= 150 ? 14 : 13), weight: .medium)
         thumbnailView.image = fallbackIcon(for: entry)
         loadThumbnail(for: entry)
     }
@@ -70,7 +81,7 @@ final class FileItemView: NSCollectionViewItem {
     private func loadThumbnail(for entry: FileEntry) {
         let request = QLThumbnailGenerator.Request(
             fileAt: entry.url,
-            size: CGSize(width: 160, height: 140),
+            size: CGSize(width: 512, height: 460),
             scale: NSScreen.main?.backingScaleFactor ?? 2,
             representationTypes: .all
         )

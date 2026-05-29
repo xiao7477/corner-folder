@@ -12,7 +12,7 @@ PYTHON="/Users/xiao-mbp2023/CodeSpace/MyTools/venv/bin/python3"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$ROOT_DIR/.clang-module-cache"
 
 CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.clang-module-cache" \
-swiftc -parse-as-library "$ROOT_DIR"/Sources/*.swift \
+swiftc "$ROOT_DIR"/Sources/*.swift \
   -o "$MACOS_DIR/FolderQuick" \
   -framework AppKit \
   -framework Quartz \

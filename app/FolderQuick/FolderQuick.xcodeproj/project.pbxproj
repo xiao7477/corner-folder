@@ -16,6 +16,13 @@
 		20A100000000000000000007 /* SettingsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000007 /* SettingsPanel.swift */; };
 		20A100000000000000000008 /* SidebarWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000008 /* SidebarWindowController.swift */; };
 		20A100000000000000000009 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000009 /* main.swift */; };
+		20A100000000000000000015 /* FolderTabButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000015 /* FolderTabButton.swift */; };
+		20A100000000000000000016 /* FileListRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000016 /* FileListRowView.swift */; };
+		20A100000000000000000017 /* FileOutlineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000017 /* FileOutlineView.swift */; };
+		20A100000000000000000018 /* HorizontalTabScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000018 /* HorizontalTabScrollView.swift */; };
+		20A100000000000000000019 /* FileCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000019 /* FileCollectionView.swift */; };
+		20A100000000000000000020 /* FilePasteboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000020 /* FilePasteboardReader.swift */; };
+		20A100000000000000000021 /* FileDropScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000021 /* FileDropScrollView.swift */; };
 		20A100000000000000000010 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000010 /* AppKit.framework */; };
 		20A100000000000000000011 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000011 /* Quartz.framework */; };
 		20A100000000000000000012 /* QuickLookThumbnailing.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000012 /* QuickLookThumbnailing.framework */; };
@@ -36,6 +43,13 @@
 		20A000000000000000000012 /* QuickLookThumbnailing.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLookThumbnailing.framework; path = System/Library/Frameworks/QuickLookThumbnailing.framework; sourceTree = SDKROOT; };
 		20A000000000000000000013 /* FolderQuick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FolderQuick.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		20A000000000000000000014 /* AppInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = AppInfo.plist; sourceTree = "<group>"; };
+		20A000000000000000000015 /* FolderTabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderTabButton.swift; sourceTree = "<group>"; };
+		20A000000000000000000016 /* FileListRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileListRowView.swift; sourceTree = "<group>"; };
+		20A000000000000000000017 /* FileOutlineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOutlineView.swift; sourceTree = "<group>"; };
+		20A000000000000000000018 /* HorizontalTabScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HorizontalTabScrollView.swift; sourceTree = "<group>"; };
+		20A000000000000000000019 /* FileCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileCollectionView.swift; sourceTree = "<group>"; };
+		20A000000000000000000020 /* FilePasteboardReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePasteboardReader.swift; sourceTree = "<group>"; };
+		20A000000000000000000021 /* FileDropScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDropScrollView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,12 +81,19 @@
 			children = (
 				20A000000000000000000001 /* EdgeTriggerView.swift */,
 				20A000000000000000000002 /* FileItemView.swift */,
+				20A000000000000000000019 /* FileCollectionView.swift */,
+				20A000000000000000000021 /* FileDropScrollView.swift */,
 				20A000000000000000000003 /* FileLoader.swift */,
+				20A000000000000000000020 /* FilePasteboardReader.swift */,
 				20A000000000000000000004 /* FolderStore.swift */,
+				20A000000000000000000015 /* FolderTabButton.swift */,
 				20A000000000000000000005 /* GlobalHotkey.swift */,
+				20A000000000000000000018 /* HorizontalTabScrollView.swift */,
 				20A000000000000000000006 /* Models.swift */,
 				20A000000000000000000007 /* SettingsPanel.swift */,
 				20A000000000000000000008 /* SidebarWindowController.swift */,
+				20A000000000000000000016 /* FileListRowView.swift */,
+				20A000000000000000000017 /* FileOutlineView.swift */,
 				20A000000000000000000009 /* main.swift */,
 			);
 			path = Sources;
@@ -172,6 +193,13 @@
 				20A100000000000000000006 /* Models.swift in Sources */,
 				20A100000000000000000007 /* SettingsPanel.swift in Sources */,
 				20A100000000000000000008 /* SidebarWindowController.swift in Sources */,
+				20A100000000000000000015 /* FolderTabButton.swift in Sources */,
+				20A100000000000000000016 /* FileListRowView.swift in Sources */,
+				20A100000000000000000017 /* FileOutlineView.swift in Sources */,
+				20A100000000000000000018 /* HorizontalTabScrollView.swift in Sources */,
+				20A100000000000000000019 /* FileCollectionView.swift in Sources */,
+				20A100000000000000000020 /* FilePasteboardReader.swift in Sources */,
+				20A100000000000000000021 /* FileDropScrollView.swift in Sources */,
 				20A100000000000000000009 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

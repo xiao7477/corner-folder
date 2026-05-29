@@ -4,19 +4,24 @@ final class SettingsPanel: NSPanel {
     var onSettingsChanged: ((AppSettings) -> Void)?
 
     private var settings: AppSettings
-    private let positionControl = NSSegmentedControl(labels: SidebarPosition.allCases.map(\.rawValue), trackingMode: .selectOne, target: nil, action: nil)
+    private let positionButton = NSPopUpButton()
+    private var triggerButtons: [NSButton] = []
     private let opacitySlider = NSSlider(value: 0.96, minValue: 0.55, maxValue: 1.0, target: nil, action: nil)
-    private let iconSizeSlider = NSSlider(value: 132, minValue: 108, maxValue: 168, target: nil, action: nil)
+    private let iconSizeSlider = NSSlider(value: 96, minValue: 56, maxValue: 168, target: nil, action: nil)
+    private let iconSpacingSlider = NSSlider(value: 12, minValue: 4, maxValue: 36, target: nil, action: nil)
     private let autoHideSlider = NSSlider(value: 0.35, minValue: 0.1, maxValue: 1.2, target: nil, action: nil)
+    private let edgeEnabledButton = NSButton(checkboxWithTitle: "启用边缘触发", target: nil, action: nil)
     private let edgeDebugButton = NSButton(checkboxWithTitle: "显示边缘触发条", target: nil, action: nil)
+    private let bottomPathButton = NSButton(checkboxWithTitle: "底部显示当前目录路径", target: nil, action: nil)
     private let opacityValue = NSTextField(labelWithString: "")
     private let iconSizeValue = NSTextField(labelWithString: "")
+    private let iconSpacingValue = NSTextField(labelWithString: "")
     private let autoHideValue = NSTextField(labelWithString: "")
 
     init(settings: AppSettings) {
         self.settings = settings
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 360),
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 560),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -44,9 +49,12 @@ final class SettingsPanel: NSPanel {
         title.font = .systemFont(ofSize: 18, weight: .semibold)
         stack.addArrangedSubview(title)
 
-        positionControl.target = self
-        positionControl.action = #selector(controlChanged)
-        stack.addArrangedSubview(row(label: "窗口位置", control: positionControl, valueLabel: nil))
+        positionButton.addItems(withTitles: WindowAnchor.allCases.map(\.rawValue))
+        positionButton.target = self
+        positionButton.action = #selector(controlChanged)
+        stack.addArrangedSubview(row(label: "点击图标弹出位置", control: positionButton, valueLabel: nil))
+
+        stack.addArrangedSubview(triggerSelector())
 
         opacitySlider.target = self
         opacitySlider.action = #selector(controlChanged)
@@ -56,13 +64,25 @@ final class SettingsPanel: NSPanel {
         iconSizeSlider.action = #selector(controlChanged)
         stack.addArrangedSubview(row(label: "图标大小", control: iconSizeSlider, valueLabel: iconSizeValue))
 
+        iconSpacingSlider.target = self
+        iconSpacingSlider.action = #selector(controlChanged)
+        stack.addArrangedSubview(row(label: "图标间距", control: iconSpacingSlider, valueLabel: iconSpacingValue))
+
         autoHideSlider.target = self
         autoHideSlider.action = #selector(controlChanged)
         stack.addArrangedSubview(row(label: "自动隐藏延迟", control: autoHideSlider, valueLabel: autoHideValue))
 
+        edgeEnabledButton.target = self
+        edgeEnabledButton.action = #selector(controlChanged)
+        stack.addArrangedSubview(edgeEnabledButton)
+
         edgeDebugButton.target = self
         edgeDebugButton.action = #selector(controlChanged)
         stack.addArrangedSubview(edgeDebugButton)
+
+        bottomPathButton.target = self
+        bottomPathButton.action = #selector(controlChanged)
+        stack.addArrangedSubview(bottomPathButton)
 
         let hint = NSTextField(labelWithString: "快捷键暂时固定为 ⌥⌘F。后续版本再支持自定义。")
         hint.font = .systemFont(ofSize: 12)
@@ -103,28 +123,70 @@ final class SettingsPanel: NSPanel {
         return stack
     }
 
+    private func triggerSelector() -> NSView {
+        let title = NSTextField(labelWithString: "边缘触发条")
+        title.font = .systemFont(ofSize: 13, weight: .medium)
+        title.widthAnchor.constraint(equalToConstant: 118).isActive = true
+
+        let grid = NSGridView()
+        grid.rowSpacing = 8
+        grid.columnSpacing = 10
+
+        triggerButtons = WindowAnchor.allCases.map { anchor in
+            let button = NSButton(checkboxWithTitle: anchor.rawValue, target: self, action: #selector(controlChanged))
+            button.tag = WindowAnchor.allCases.firstIndex(of: anchor) ?? 0
+            return button
+        }
+
+        for row in 0..<4 {
+            let start = row * 2
+            let views = Array(triggerButtons[start..<(start + 2)])
+            grid.addRow(with: views)
+        }
+
+        let stack = NSStackView(views: [title, grid])
+        stack.orientation = .horizontal
+        stack.alignment = .top
+        stack.spacing = 12
+        return stack
+    }
+
     private func applySettingsToControls() {
-        positionControl.selectedSegment = SidebarPosition.allCases.firstIndex(of: settings.sidebarPosition) ?? 0
+        positionButton.selectItem(at: WindowAnchor.allCases.firstIndex(of: settings.sidebarPosition) ?? 0)
+        for button in triggerButtons {
+            let anchor = WindowAnchor.allCases[button.tag]
+            button.state = settings.triggerPositions.contains(anchor) ? .on : .off
+        }
         opacitySlider.doubleValue = settings.opacity
         iconSizeSlider.doubleValue = settings.iconSize
+        iconSpacingSlider.doubleValue = settings.iconSpacing
         autoHideSlider.doubleValue = settings.autoHideDelay
+        edgeEnabledButton.state = settings.edgeTriggerEnabled ? .on : .off
         edgeDebugButton.state = settings.showEdgeTrigger ? .on : .off
+        bottomPathButton.state = settings.showBottomPath ? .on : .off
         refreshValueLabels()
     }
 
     private func refreshValueLabels() {
         opacityValue.stringValue = "\(Int(settings.opacity * 100))%"
         iconSizeValue.stringValue = "\(Int(settings.iconSize))"
+        iconSpacingValue.stringValue = "\(Int(settings.iconSpacing))"
         autoHideValue.stringValue = String(format: "%.1fs", settings.autoHideDelay)
     }
 
     @objc private func controlChanged() {
-        let selectedIndex = max(0, positionControl.selectedSegment)
-        settings.sidebarPosition = SidebarPosition.allCases[selectedIndex]
+        settings.sidebarPosition = WindowAnchor.allCases[max(0, positionButton.indexOfSelectedItem)]
+        let selectedTriggers = triggerButtons.compactMap { button -> WindowAnchor? in
+            button.state == .on ? WindowAnchor.allCases[button.tag] : nil
+        }
+        settings.triggerPositions = selectedTriggers.isEmpty ? [.right] : selectedTriggers
         settings.opacity = opacitySlider.doubleValue
         settings.iconSize = iconSizeSlider.doubleValue
+        settings.iconSpacing = iconSpacingSlider.doubleValue
         settings.autoHideDelay = autoHideSlider.doubleValue
+        settings.edgeTriggerEnabled = edgeEnabledButton.state == .on
         settings.showEdgeTrigger = edgeDebugButton.state == .on
+        settings.showBottomPath = bottomPathButton.state == .on
         refreshValueLabels()
         onSettingsChanged?(settings)
     }
