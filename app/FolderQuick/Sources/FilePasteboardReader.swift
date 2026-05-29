@@ -54,3 +54,19 @@ enum FilePasteboardReader {
         return urls.isEmpty ? nil : urls
     }
 }
+
+enum FolderQuickDragCancel {
+    private static var cancelled = false
+
+    static var isCancelled: Bool {
+        cancelled
+    }
+
+    static func cancelCurrentDrag() {
+        cancelled = true
+    }
+
+    static func reset() {
+        cancelled = false
+    }
+}

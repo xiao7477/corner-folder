@@ -6,6 +6,9 @@ final class FileListRowView: NSTableCellView {
     private let iconView = NSImageView()
     private let nameLabel = NSTextField(labelWithString: "")
     private let detailLabel = NSTextField(labelWithString: "")
+    var isDropHovered: Bool = false {
+        didSet { updateHoverState() }
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -18,6 +21,9 @@ final class FileListRowView: NSTableCellView {
     }
 
     private func build() {
+        wantsLayer = true
+        layer?.cornerRadius = 6
+
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.imageScaling = .scaleProportionallyUpOrDown
 
@@ -52,11 +58,18 @@ final class FileListRowView: NSTableCellView {
     }
 
     func configure(entry: FileEntry, depth: Int) {
+        isDropHovered = false
         let icon = NSWorkspace.shared.icon(forFile: entry.url.path)
         icon.size = NSSize(width: 22, height: 22)
         iconView.image = icon
         nameLabel.stringValue = entry.name
         detailLabel.stringValue = entry.isDirectory ? "文件夹" : entry.kind.rawValue
+    }
+
+    private func updateHoverState() {
+        layer?.backgroundColor = isDropHovered ? NSColor.controlAccentColor.withAlphaComponent(0.24).cgColor : NSColor.clear.cgColor
+        nameLabel.textColor = isDropHovered ? .controlAccentColor : .labelColor
+        detailLabel.textColor = isDropHovered ? .controlAccentColor : .secondaryLabelColor
     }
 }
 

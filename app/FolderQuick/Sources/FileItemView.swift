@@ -10,6 +10,9 @@ final class FileItemView: NSCollectionViewItem {
     private var thumbnailWidthConstraint: NSLayoutConstraint?
     private var thumbnailHeightConstraint: NSLayoutConstraint?
     private var representedURL: URL?
+    var isDropHovered: Bool = false {
+        didSet { updateBackground() }
+    }
 
     override func loadView() {
         view = NSView(frame: NSRect(x: 0, y: 0, width: 132, height: 138))
@@ -57,12 +60,13 @@ final class FileItemView: NSCollectionViewItem {
 
     override var isSelected: Bool {
         didSet {
-            selectionView.layer?.backgroundColor = isSelected ? NSColor.controlAccentColor.withAlphaComponent(0.24).cgColor : NSColor.clear.cgColor
+            updateBackground()
         }
     }
 
     func configure(with entry: FileEntry, iconSize: Double) {
         representedURL = entry.url
+        isDropHovered = false
         titleLabel.stringValue = entry.name
         let thumbnailSize = max(34, min(iconSize * 0.78, iconSize - 12))
         thumbnailWidthConstraint?.constant = thumbnailSize
@@ -70,6 +74,16 @@ final class FileItemView: NSCollectionViewItem {
         titleLabel.font = .systemFont(ofSize: iconSize < 76 ? 11 : (iconSize >= 150 ? 14 : 13), weight: .medium)
         thumbnailView.image = fallbackIcon(for: entry)
         loadThumbnail(for: entry)
+    }
+
+    private func updateBackground() {
+        if isDropHovered {
+            selectionView.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.38).cgColor
+            titleLabel.textColor = .controlAccentColor
+        } else {
+            selectionView.layer?.backgroundColor = isSelected ? NSColor.controlAccentColor.withAlphaComponent(0.24).cgColor : NSColor.clear.cgColor
+            titleLabel.textColor = .labelColor
+        }
     }
 
     private func fallbackIcon(for entry: FileEntry) -> NSImage {

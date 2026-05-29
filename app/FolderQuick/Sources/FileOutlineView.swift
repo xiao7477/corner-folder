@@ -25,15 +25,25 @@ final class FileOutlineView: NSOutlineView {
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !FolderQuickDragCancel.isCancelled else { return [] }
         return dragOperation(for: sender)
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !FolderQuickDragCancel.isCancelled else {
+            onHoverRow?(nil)
+            return []
+        }
         onHoverRow?(dropRow(for: sender))
         return dragOperation(for: sender)
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard !FolderQuickDragCancel.isCancelled else {
+            onHoverRow?(nil)
+            FolderQuickDragCancel.reset()
+            return false
+        }
         let urls = FilePasteboardReader.fileURLs(from: sender.draggingPasteboard)
         guard !urls.isEmpty else { return false }
         let row = dropRow(for: sender)
@@ -43,6 +53,7 @@ final class FileOutlineView: NSOutlineView {
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
         onHoverRow?(nil)
+        FolderQuickDragCancel.reset()
     }
 
     private func dragOperation(for sender: NSDraggingInfo) -> NSDragOperation {

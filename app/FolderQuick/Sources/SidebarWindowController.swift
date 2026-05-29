@@ -1,6 +1,72 @@
 import AppKit
 import Quartz
 
+final class FileHoverButton: NSButton {
+    var onFileHover: ((Bool) -> Void)?
+    var isFileDropHovered: Bool = false {
+        didSet {
+            contentTintColor = isFileDropHovered ? .controlAccentColor : nil
+        }
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        registerForDraggedTypes(FilePasteboardReader.supportedTypes)
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        registerForDraggedTypes(FilePasteboardReader.supportedTypes)
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !FolderQuickDragCancel.isCancelled else {
+            isFileDropHovered = false
+            onFileHover?(false)
+            return []
+        }
+        return dragOperation(for: sender, hovering: true)
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !FolderQuickDragCancel.isCancelled else {
+            isFileDropHovered = false
+            onFileHover?(false)
+            return []
+        }
+        return dragOperation(for: sender, hovering: true)
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        isFileDropHovered = false
+        onFileHover?(false)
+        FolderQuickDragCancel.reset()
+    }
+
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        isFileDropHovered = false
+        onFileHover?(false)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        isFileDropHovered = false
+        onFileHover?(false)
+        FolderQuickDragCancel.reset()
+        return false
+    }
+
+    private func dragOperation(for sender: NSDraggingInfo, hovering: Bool) -> NSDragOperation {
+        guard !FilePasteboardReader.fileURLs(from: sender.draggingPasteboard).isEmpty else {
+            isFileDropHovered = false
+            onFileHover?(false)
+            return []
+        }
+        isFileDropHovered = hovering
+        onFileHover?(hovering)
+        return .copy
+    }
+}
+
 final class SidebarWindowController: NSObject {
     private let store = FolderStore.shared
     private let loader = FileLoader()
@@ -35,8 +101,14 @@ final class SidebarWindowController: NSObject {
     private var hideWorkItem: DispatchWorkItem?
     private var hoverFolderWorkItem: DispatchWorkItem?
     private var hoveredDropFolderURL: URL?
+    private var hoverTabWorkItem: DispatchWorkItem?
+    private var hoveredDropTabID: UUID?
+    private var hoverBackWorkItem: DispatchWorkItem?
+    private var highlightedDropFolderURL: URL?
+    private var highlightedDropTabID: UUID?
     private var keyMonitor: Any?
     private var mouseMonitor: Any?
+    private var dragCancelMonitors: [Any] = []
 
     private var folders: [FolderEntry] = []
     private var selectedFolderID: UUID?
@@ -70,6 +142,7 @@ final class SidebarWindowController: NSObject {
         }
         installKeyMonitor()
         installMouseMonitor()
+        installDragCancelMonitors()
         reloadFolderMenu()
         loadSelectedFolder()
     }
@@ -81,6 +154,7 @@ final class SidebarWindowController: NSObject {
         if let mouseMonitor {
             NSEvent.removeMonitor(mouseMonitor)
         }
+        dragCancelMonitors.forEach { NSEvent.removeMonitor($0) }
     }
 
     func showWindow() {
@@ -218,6 +292,12 @@ final class SidebarWindowController: NSObject {
         tabBarView.onDropTab = { [weak self] from, to in
             self?.moveFolderTab(from: from, to: to)
         }
+        tabBarView.onHoverFileTab = { [weak self] index in
+            self?.handleTabDropHover(index: index)
+        }
+        tabBarView.onDropFilesOnTab = { [weak self] urls, index in
+            self?.importFiles(urls, to: self?.dropDestinationForTab(index: index)) ?? false
+        }
 
         backButton = iconButton("chevron.left", action: #selector(goBack))
         refreshButton = iconButton("arrow.clockwise", action: #selector(refreshFiles))
@@ -292,7 +372,10 @@ final class SidebarWindowController: NSObject {
         typeButton.target = self
         typeButton.action = #selector(applyFilters)
 
-        backButton = iconButton("chevron.left", action: #selector(goBack))
+        backButton = hoverIconButton("chevron.left", action: #selector(goBack))
+        (backButton as? FileHoverButton)?.onFileHover = { [weak self] isHovering in
+            self?.handleBackDropHover(isHovering: isHovering)
+        }
         viewModeControl.selectedSegment = FileViewMode.allCases.firstIndex(of: settings.viewMode) ?? 0
         viewModeControl.target = self
         viewModeControl.action = #selector(viewModeChanged)
@@ -455,6 +538,18 @@ final class SidebarWindowController: NSObject {
 
     private func iconButton(_ systemName: String, action: Selector) -> NSButton {
         let button = NSButton()
+        button.image = NSImage(systemSymbolName: systemName, accessibilityDescription: nil)
+        button.bezelStyle = .texturedRounded
+        button.isBordered = false
+        button.target = self
+        button.action = action
+        button.widthAnchor.constraint(equalToConstant: 36).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        return button
+    }
+
+    private func hoverIconButton(_ systemName: String, action: Selector) -> NSButton {
+        let button = FileHoverButton()
         button.image = NSImage(systemSymbolName: systemName, accessibilityDescription: nil)
         button.bezelStyle = .texturedRounded
         button.isBordered = false
@@ -967,11 +1062,27 @@ final class SidebarWindowController: NSObject {
         return node.entry.isDirectory ? node.entry.url : currentFolderURL
     }
 
+    private func dropDestinationForTab(index: Int) -> URL? {
+        guard folders.indices.contains(index),
+              let rootURL = store.resolve(folders[index]) else {
+            return nil
+        }
+
+        let id = folders[index].id
+        if let state = folderNavigationStates[id],
+           state.rootURL == rootURL,
+           FileManager.default.fileExists(atPath: state.currentURL.path) {
+            return state.currentURL
+        }
+        return rootURL
+    }
+
     private func handleGridDropHover(indexPath: IndexPath?) {
         guard let indexPath,
               shownFiles.indices.contains(indexPath.item),
               shownFiles[indexPath.item].isDirectory else {
             cancelDropFolderHover()
+            clearDropFolderHighlight()
             return
         }
         scheduleDropFolderHover(url: shownFiles[indexPath.item].url)
@@ -983,25 +1094,44 @@ final class SidebarWindowController: NSObject {
               let node = outlineView.item(atRow: row) as? FileNode,
               node.entry.isDirectory else {
             cancelDropFolderHover()
+            clearDropFolderHighlight()
             return
         }
         scheduleDropFolderHover(url: node.entry.url)
+    }
+
+    private func handleTabDropHover(index: Int?) {
+        guard let index, folders.indices.contains(index) else {
+            cancelDropTabHover()
+            clearDropTabHighlight()
+            return
+        }
+        scheduleDropTabHover(index: index)
+    }
+
+    private func handleBackDropHover(isHovering: Bool) {
+        guard isHovering, !navigationStack.isEmpty else {
+            cancelDropBackHover()
+            return
+        }
+        scheduleDropBackHover()
     }
 
     private func scheduleDropFolderHover(url: URL) {
         guard hoveredDropFolderURL != url else { return }
         cancelDropFolderHover()
         hoveredDropFolderURL = url
-        flashDropFolder(url: url)
+        setDropFolderHighlight(url: url)
 
         let workItem = DispatchWorkItem { [weak self] in
             guard let self, self.hoveredDropFolderURL == url else { return }
             self.enterFolder(url)
+            self.clearDropFolderHighlight()
             self.hoveredDropFolderURL = nil
             self.hoverFolderWorkItem = nil
         }
         hoverFolderWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
     }
 
     private func cancelDropFolderHover() {
@@ -1010,26 +1140,133 @@ final class SidebarWindowController: NSObject {
         hoveredDropFolderURL = nil
     }
 
-    private func flashDropFolder(url: URL) {
-        if settings.viewMode == .grid,
-           let index = shownFiles.firstIndex(where: { $0.url == url }),
-           let item = collectionView.item(at: IndexPath(item: index, section: 0)) {
-            flashView(item.view)
+    private func scheduleDropTabHover(index: Int) {
+        guard folders.indices.contains(index) else { return }
+        let id = folders[index].id
+        guard selectedFolderID != id else {
+            cancelDropTabHover()
             return
+        }
+        guard hoveredDropTabID != id else { return }
+
+        cancelDropTabHover()
+        hoveredDropTabID = id
+        setDropTabHighlight(index: index)
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.hoveredDropTabID == id else { return }
+            self.selectFolderTab(index: index)
+            self.clearDropTabHighlight()
+            self.hoveredDropTabID = nil
+            self.hoverTabWorkItem = nil
+        }
+        hoverTabWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+    }
+
+    private func cancelDropTabHover() {
+        hoverTabWorkItem?.cancel()
+        hoverTabWorkItem = nil
+        hoveredDropTabID = nil
+    }
+
+    private func scheduleDropBackHover() {
+        guard hoverBackWorkItem == nil else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.hoverBackWorkItem = nil
+            guard !self.navigationStack.isEmpty else { return }
+            self.goBack()
+        }
+        hoverBackWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+    }
+
+    private func cancelDropBackHover() {
+        hoverBackWorkItem?.cancel()
+        hoverBackWorkItem = nil
+    }
+
+    private func cancelActiveDragInteractions() {
+        FolderQuickDragCancel.cancelCurrentDrag()
+        cancelDropFolderHover()
+        cancelDropTabHover()
+        cancelDropBackHover()
+        clearDropFolderHighlight()
+        clearDropTabHighlight()
+        (backButton as? FileHoverButton)?.isFileDropHovered = false
+    }
+
+    private func hasActiveDragInteraction() -> Bool {
+        hoverFolderWorkItem != nil
+            || hoverTabWorkItem != nil
+            || hoverBackWorkItem != nil
+            || highlightedDropFolderURL != nil
+            || highlightedDropTabID != nil
+            || ((backButton as? FileHoverButton)?.isFileDropHovered ?? false)
+    }
+
+    private func setDropFolderHighlight(url: URL) {
+        if highlightedDropFolderURL == url { return }
+        clearDropFolderHighlight()
+        highlightedDropFolderURL = url
+        setDropFolderHighlight(url: url, isHighlighted: true)
+    }
+
+    private func clearDropFolderHighlight() {
+        guard let url = highlightedDropFolderURL else { return }
+        setDropFolderHighlight(url: url, isHighlighted: false)
+        highlightedDropFolderURL = nil
+    }
+
+    private func setDropFolderHighlight(url: URL, isHighlighted: Bool) {
+        if let index = shownFiles.firstIndex(where: { $0.url == url }),
+           let item = collectionView.item(at: IndexPath(item: index, section: 0)) as? FileItemView {
+            item.isDropHovered = isHighlighted
         }
 
         for row in 0..<outlineView.numberOfRows {
             guard let node = outlineView.item(atRow: row) as? FileNode,
                   node.entry.url == url,
-                  let view = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) else {
+                  let view = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? FileListRowView else {
                 continue
             }
-            flashView(view)
-            return
+            view.isDropHovered = isHighlighted
         }
     }
 
+    private func setDropTabHighlight(index: Int) {
+        guard folders.indices.contains(index) else { return }
+        let id = folders[index].id
+        if highlightedDropTabID == id { return }
+        clearDropTabHighlight()
+        highlightedDropTabID = id
+        setDropTabHighlight(id: id, isHighlighted: true)
+    }
+
+    private func clearDropTabHighlight() {
+        guard let id = highlightedDropTabID else { return }
+        setDropTabHighlight(id: id, isHighlighted: false)
+        highlightedDropTabID = nil
+    }
+
+    private func setDropTabHighlight(id: UUID, isHighlighted: Bool) {
+        guard let index = folders.firstIndex(where: { $0.id == id }) else { return }
+        tabBarView.subviews
+            .compactMap { $0 as? FolderTabButton }
+            .first(where: { $0.folderIndex == index })?
+            .isDropHovered = isHighlighted
+    }
+
     private func flashView(_ view: NSView) {
+        if let button = view as? NSButton {
+            button.contentTintColor = .controlAccentColor
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                button.contentTintColor = nil
+            }
+            return
+        }
         view.wantsLayer = true
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.16
@@ -1186,6 +1423,38 @@ final class SidebarWindowController: NSObject {
                 self.setTabMoveMode(false)
             }
             return event
+        }
+    }
+
+    private func installDragCancelMonitors() {
+        let local = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .leftMouseUp]) { [weak self] event in
+            if event.type == .rightMouseDown {
+                guard let self, self.hasActiveDragInteraction() else { return event }
+                self.cancelActiveDragInteractions()
+                return nil
+            }
+            if event.type == .leftMouseUp {
+                FolderQuickDragCancel.reset()
+            }
+            return event
+        }
+
+        dragCancelMonitors.append(local as Any)
+
+        if let globalRight = NSEvent.addGlobalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.cancelActiveDragInteractions()
+            }
+        }) {
+            dragCancelMonitors.append(globalRight)
+        }
+
+        if let globalLeftUp = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp], handler: { _ in
+            DispatchQueue.main.async {
+                FolderQuickDragCancel.reset()
+            }
+        }) {
+            dragCancelMonitors.append(globalLeftUp)
         }
     }
 

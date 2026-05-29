@@ -11,6 +11,9 @@ final class FolderTabButton: NSView, NSDraggingSource {
     var isSelected: Bool = false {
         didSet { needsDisplay = true }
     }
+    var isDropHovered: Bool = false {
+        didSet { needsDisplay = true }
+    }
     var isMoveModeEnabled: Bool = false {
         didSet { updateJiggle() }
     }
@@ -34,12 +37,17 @@ final class FolderTabButton: NSView, NSDraggingSource {
         super.draw(dirtyRect)
         let rect = bounds.insetBy(dx: 0.5, dy: 0.5)
         let path = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
-        let fill = isSelected ? NSColor.controlAccentColor.withAlphaComponent(0.28) : NSColor.controlBackgroundColor.withAlphaComponent(0.52)
+        let fill: NSColor
+        if isDropHovered {
+            fill = NSColor.controlAccentColor.withAlphaComponent(0.45)
+        } else {
+            fill = isSelected ? NSColor.controlAccentColor.withAlphaComponent(0.28) : NSColor.controlBackgroundColor.withAlphaComponent(0.52)
+        }
         fill.setFill()
         path.fill()
 
-        if isSelected {
-            NSColor.controlAccentColor.withAlphaComponent(0.7).setStroke()
+        if isSelected || isDropHovered {
+            NSColor.controlAccentColor.withAlphaComponent(isDropHovered ? 0.95 : 0.7).setStroke()
             path.lineWidth = 1
             path.stroke()
         }
@@ -49,7 +57,7 @@ final class FolderTabButton: NSView, NSDraggingSource {
         paragraph.lineBreakMode = .byTruncatingMiddle
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 13, weight: isSelected ? .semibold : .medium),
-            .foregroundColor: NSColor.labelColor,
+            .foregroundColor: isDropHovered ? NSColor.controlAccentColor : NSColor.labelColor,
             .paragraphStyle: paragraph
         ]
         let textRect = rect.insetBy(dx: 12, dy: 7)
@@ -118,6 +126,8 @@ final class FolderTabButton: NSView, NSDraggingSource {
 
 final class TabBarView: NSView {
     var onDropTab: ((Int, Int) -> Void)?
+    var onHoverFileTab: ((Int?) -> Void)?
+    var onDropFilesOnTab: (([URL], Int) -> Bool)?
     override var mouseDownCanMoveWindow: Bool { false }
     private var insertionLineX: CGFloat? {
         didSet { needsDisplay = true }
@@ -125,29 +135,60 @@ final class TabBarView: NSView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        registerForDraggedTypes([FolderTabButton.pasteboardType])
+        registerForDraggedTypes([FolderTabButton.pasteboardType] + FilePasteboardReader.supportedTypes)
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        registerForDraggedTypes([FolderTabButton.pasteboardType])
+        registerForDraggedTypes([FolderTabButton.pasteboardType] + FilePasteboardReader.supportedTypes)
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !FolderQuickDragCancel.isCancelled else {
+            onHoverFileTab?(nil)
+            return []
+        }
+        if isFileDrag(sender) {
+            onHoverFileTab?(tabIndex(for: sender))
+            return .copy
+        }
         updateInsertionLine(sender)
         return .move
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !FolderQuickDragCancel.isCancelled else {
+            onHoverFileTab?(nil)
+            return []
+        }
+        if isFileDrag(sender) {
+            onHoverFileTab?(tabIndex(for: sender))
+            return .copy
+        }
         updateInsertionLine(sender)
         return .move
     }
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
         insertionLineX = nil
+        onHoverFileTab?(nil)
+        FolderQuickDragCancel.reset()
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard !FolderQuickDragCancel.isCancelled else {
+            insertionLineX = nil
+            onHoverFileTab?(nil)
+            FolderQuickDragCancel.reset()
+            return false
+        }
+        if isFileDrag(sender) {
+            let urls = FilePasteboardReader.fileURLs(from: sender.draggingPasteboard)
+            guard !urls.isEmpty, let index = tabIndex(for: sender) else { return false }
+            onHoverFileTab?(nil)
+            return onDropFilesOnTab?(urls, index) ?? false
+        }
+
         guard let text = sender.draggingPasteboard.string(forType: FolderTabButton.pasteboardType),
               let from = Int(text) else {
             return false
@@ -163,6 +204,7 @@ final class TabBarView: NSView {
 
     override func concludeDragOperation(_ sender: NSDraggingInfo?) {
         insertionLineX = nil
+        onHoverFileTab?(nil)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -178,6 +220,19 @@ final class TabBarView: NSView {
     private func updateInsertionLine(_ sender: NSDraggingInfo) {
         let point = convert(sender.draggingLocation, from: nil)
         insertionLineX = insertionTarget(at: point)?.lineX
+    }
+
+    private func isFileDrag(_ sender: NSDraggingInfo) -> Bool {
+        sender.draggingPasteboard.string(forType: FolderTabButton.pasteboardType) == nil
+            && !FilePasteboardReader.fileURLs(from: sender.draggingPasteboard).isEmpty
+    }
+
+    private func tabIndex(for sender: NSDraggingInfo) -> Int? {
+        let point = convert(sender.draggingLocation, from: nil)
+        return subviews
+            .compactMap { $0 as? FolderTabButton }
+            .first { $0.frame.contains(point) }?
+            .folderIndex
     }
 
     private func insertionTarget(at point: NSPoint) -> (index: Int, lineX: CGFloat)? {

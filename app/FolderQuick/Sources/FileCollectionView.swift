@@ -34,15 +34,25 @@ final class FileCollectionView: NSCollectionView {
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !FolderQuickDragCancel.isCancelled else { return [] }
         return dragOperation(for: sender)
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !FolderQuickDragCancel.isCancelled else {
+            onHoverItem?(nil)
+            return []
+        }
         onHoverItem?(dropIndexPath(for: sender))
         return dragOperation(for: sender)
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard !FolderQuickDragCancel.isCancelled else {
+            onHoverItem?(nil)
+            FolderQuickDragCancel.reset()
+            return false
+        }
         let urls = FilePasteboardReader.fileURLs(from: sender.draggingPasteboard)
         guard !urls.isEmpty else { return false }
         let indexPath = dropIndexPath(for: sender)
@@ -52,6 +62,7 @@ final class FileCollectionView: NSCollectionView {
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
         onHoverItem?(nil)
+        FolderQuickDragCancel.reset()
     }
 
     private func dragOperation(for sender: NSDraggingInfo) -> NSDragOperation {

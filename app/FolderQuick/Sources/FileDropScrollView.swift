@@ -14,14 +14,20 @@ final class FileDropScrollView: NSScrollView {
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        dragOperation(for: sender)
+        guard !FolderQuickDragCancel.isCancelled else { return [] }
+        return dragOperation(for: sender)
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        dragOperation(for: sender)
+        guard !FolderQuickDragCancel.isCancelled else { return [] }
+        return dragOperation(for: sender)
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard !FolderQuickDragCancel.isCancelled else {
+            FolderQuickDragCancel.reset()
+            return false
+        }
         let urls = FilePasteboardReader.fileURLs(from: sender.draggingPasteboard)
         guard !urls.isEmpty else { return false }
         return onDropFiles?(urls) ?? false
