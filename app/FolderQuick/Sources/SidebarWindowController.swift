@@ -236,10 +236,21 @@ final class SidebarWindowController: NSObject {
         triggerView.wantsLayer = true
         triggerView.layer?.backgroundColor = NSColor.clear.cgColor
         triggerView.onMouseEnter = { [weak self] in
-            self?.showWindow(anchor: anchor, screen: screen)
+            self?.handleEdgeTrigger(anchor: anchor, screen: screen)
         }
         edgePanel.contentView = triggerView
         return edgePanel
+    }
+
+    private func handleEdgeTrigger(anchor: WindowAnchor, screen: NSScreen) {
+        if panel.isVisible, isPinned {
+            if settings.hidePinnedWindowOnEdgeTrigger == true {
+                hideWindow()
+            }
+            return
+        }
+
+        showWindow(anchor: anchor, screen: screen)
     }
 
     private func rebuildEdgeTriggers() {
@@ -402,9 +413,9 @@ final class SidebarWindowController: NSObject {
 
         let layout = NSCollectionViewFlowLayout()
         layout.itemSize = itemSize()
-        layout.sectionInset = NSEdgeInsets(top: 24, left: 34, bottom: 24, right: 34)
+        layout.sectionInset = NSEdgeInsets(top: 16, left: 34, bottom: 16, right: 34)
         layout.minimumInteritemSpacing = settings.iconSpacing
-        layout.minimumLineSpacing = settings.iconSpacing + 10
+        layout.minimumLineSpacing = max(2, settings.iconSpacing)
 
         collectionView.collectionViewLayout = layout
         collectionView.register(FileItemView.self, forItemWithIdentifier: FileItemView.identifier)
@@ -426,6 +437,9 @@ final class SidebarWindowController: NSObject {
         }
         collectionView.onHoverItem = { [weak self] indexPath in
             self?.handleGridDropHover(indexPath: indexPath)
+        }
+        collectionView.onEmptyClick = { [weak self] in
+            self?.closePreviewPanel()
         }
         scrollView.onDropFiles = { [weak self] urls in
             self?.importFiles(urls) ?? false
@@ -456,6 +470,9 @@ final class SidebarWindowController: NSObject {
         }
         outlineView.onHoverRow = { [weak self] row in
             self?.handleListDropHover(row: row)
+        }
+        outlineView.onEmptyClick = { [weak self] in
+            self?.closePreviewPanel()
         }
         outlineView.setDraggingSourceOperationMask(.copy, forLocal: false)
         outlineView.setDraggingSourceOperationMask(.copy, forLocal: true)
@@ -773,14 +790,15 @@ final class SidebarWindowController: NSObject {
 
     private func itemSize() -> NSSize {
         let width = settings.iconSize
-        return NSSize(width: width, height: width + (width < 76 ? 22 : 28))
+        let thumbnailSize = max(34, min(width * 0.78, width - 12))
+        return NSSize(width: width, height: thumbnailSize * 0.9 + (width < 76 ? 38 : 54))
     }
 
     private func applyItemSize() {
         guard let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout else { return }
         layout.itemSize = itemSize()
         layout.minimumInteritemSpacing = settings.iconSpacing
-        layout.minimumLineSpacing = settings.iconSpacing + 10
+        layout.minimumLineSpacing = max(2, settings.iconSpacing)
         layout.invalidateLayout()
     }
 
@@ -906,7 +924,7 @@ final class SidebarWindowController: NSObject {
 
     private func selectedEntries() -> [FileEntry] {
         if settings.viewMode == .list {
-            return outlineView.selectedRowIndexes.compactMap { row in
+            return selectedListRows().compactMap { row in
                 guard row >= 0, let node = outlineView.item(atRow: row) as? FileNode else { return nil }
                 return node.entry
             }
@@ -918,6 +936,10 @@ final class SidebarWindowController: NSObject {
 
     private func primarySelectedEntry() -> FileEntry? {
         selectedEntries().first
+    }
+
+    private func selectedListRows() -> [Int] {
+        outlineView.selectedRowIndexes.map { $0 }
     }
 
     private func folderMenu(index: Int) -> NSMenu {
@@ -1382,8 +1404,15 @@ final class SidebarWindowController: NSObject {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, self.panel.isVisible else { return event }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if self.isTextInputActive() {
+                return event
+            }
             if event.keyCode == 49 {
-                self.previewSelected()
+                self.togglePreviewSelected()
+                return nil
+            }
+            if self.isPreviewPanelVisible(), [123, 124, 125, 126].contains(event.keyCode) {
+                self.moveSelectionForPreview(keyCode: event.keyCode)
                 return nil
             }
             if flags.contains(.command), event.keyCode == 8 {
@@ -1463,6 +1492,36 @@ final class SidebarWindowController: NSObject {
         return entry.isDirectory ? nil : entry.url
     }
 
+    private func isTextInputActive() -> Bool {
+        guard let responder = panel.firstResponder else { return false }
+        if responder is NSTextView {
+            return true
+        }
+        if let view = responder as? NSView,
+           view.enclosingScrollView === scrollView || view.enclosingScrollView === listScrollView {
+            return false
+        }
+        return false
+    }
+
+    private func isPreviewPanelVisible() -> Bool {
+        QLPreviewPanel.sharedPreviewPanelExists() && (QLPreviewPanel.shared()?.isVisible == true)
+    }
+
+    private func closePreviewPanel() {
+        guard QLPreviewPanel.sharedPreviewPanelExists(), let panel = QLPreviewPanel.shared() else { return }
+        panel.orderOut(nil)
+        self.panel.makeKeyAndOrderFront(nil)
+    }
+
+    private func togglePreviewSelected() {
+        if isPreviewPanelVisible() {
+            closePreviewPanel()
+        } else {
+            previewSelected()
+        }
+    }
+
     @objc private func previewSelected() {
         guard selectedPreviewURL() != nil else { return }
         if let panel = QLPreviewPanel.shared() {
@@ -1489,7 +1548,97 @@ final class SidebarWindowController: NSObject {
         panel.dataSource = self
         panel.delegate = self
         panel.reloadData()
-        panel.makeKeyAndOrderFront(nil)
+        panel.currentPreviewItemIndex = 0
+    }
+
+    private func moveSelectionForPreview(keyCode: UInt16) {
+        if settings.viewMode == .list {
+            moveListSelectionForPreview(keyCode: keyCode)
+        } else {
+            moveGridSelectionForPreview(keyCode: keyCode)
+        }
+    }
+
+    private func moveListSelectionForPreview(keyCode: UInt16) {
+        guard outlineView.numberOfRows > 0 else { return }
+        let current = outlineView.selectedRow >= 0 ? outlineView.selectedRow : 0
+        let next: Int
+
+        switch keyCode {
+        case 125:
+            next = min(current + 1, outlineView.numberOfRows - 1)
+        case 126:
+            next = max(current - 1, 0)
+        case 123:
+            if outlineView.isItemExpanded(outlineView.item(atRow: current) as Any) {
+                outlineView.collapseItem(outlineView.item(atRow: current))
+            }
+            return
+        case 124:
+            if let item = outlineView.item(atRow: current),
+               outlineView.isExpandable(item),
+               !outlineView.isItemExpanded(item) {
+                outlineView.expandItem(item)
+            }
+            return
+        default:
+            return
+        }
+
+        outlineView.selectRowIndexes(IndexSet(integer: next), byExtendingSelection: false)
+        outlineView.scrollRowToVisible(next)
+    }
+
+    private func moveGridSelectionForPreview(keyCode: UInt16) {
+        guard !shownFiles.isEmpty else { return }
+        let current = collectionView.selectionIndexPaths.first?.item ?? 0
+        let next: Int
+
+        switch keyCode {
+        case 123:
+            next = max(current - 1, 0)
+        case 124:
+            next = min(current + 1, shownFiles.count - 1)
+        case 125:
+            next = nearestGridItem(from: current, movingDown: true)
+        case 126:
+            next = nearestGridItem(from: current, movingDown: false)
+        default:
+            return
+        }
+
+        let indexPath = IndexPath(item: next, section: 0)
+        collectionView.selectionIndexPaths = [indexPath]
+        collectionView.scrollToItems(at: [indexPath], scrollPosition: [])
+        previewButton.isEnabled = selectedPreviewURL() != nil
+        updatePreviewPanelForSelectionChange()
+    }
+
+    private func nearestGridItem(from current: Int, movingDown: Bool) -> Int {
+        guard let currentAttributes = collectionView.layoutAttributesForItem(at: IndexPath(item: current, section: 0)) else {
+            return current
+        }
+
+        let currentCenter = NSPoint(x: currentAttributes.frame.midX, y: currentAttributes.frame.midY)
+        var bestIndex = current
+        var bestDistance = CGFloat.greatestFiniteMagnitude
+
+        for index in shownFiles.indices where index != current {
+            guard let attributes = collectionView.layoutAttributesForItem(at: IndexPath(item: index, section: 0)) else { continue }
+            let center = NSPoint(x: attributes.frame.midX, y: attributes.frame.midY)
+            let isCandidate = movingDown ? center.y > currentCenter.y + 1 : center.y < currentCenter.y - 1
+            guard isCandidate else { continue }
+
+            let verticalDistance = abs(center.y - currentCenter.y)
+            let horizontalDistance = abs(center.x - currentCenter.x)
+            let distance = verticalDistance * 1000 + horizontalDistance
+            if distance < bestDistance {
+                bestDistance = distance
+                bestIndex = index
+            }
+        }
+
+        return bestIndex
     }
 
     private func positionPreviewPanel(_ panel: QLPreviewPanel) {
@@ -1634,21 +1783,27 @@ final class SidebarWindowController: NSObject {
 
     @objc private func renameSelectedFile() {
         guard let entry = primarySelectedEntry() else { return }
-        let alert = NSAlert()
-        alert.messageText = "重命名"
-        alert.informativeText = entry.name
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-        field.stringValue = entry.name
-        alert.accessoryView = field
-        alert.addButton(withTitle: "保存")
-        alert.addButton(withTitle: "取消")
 
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let newName = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !newName.isEmpty, newName != entry.name else { return }
-        let destination = entry.url.deletingLastPathComponent().appendingPathComponent(newName)
+        if settings.viewMode == .grid,
+           let index = shownFiles.firstIndex(where: { $0.url == entry.url }),
+           let item = collectionView.item(at: IndexPath(item: index, section: 0)) as? FileItemView {
+            item.beginRenaming()
+            return
+        }
+
+        if settings.viewMode == .list,
+           let row = selectedListRows().first,
+           let view = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? FileListRowView {
+            view.beginRenaming()
+        }
+    }
+
+    private func startRename(url: URL, newName: String) {
+        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty, trimmedName != url.lastPathComponent else { return }
+        let destination = url.deletingLastPathComponent().appendingPathComponent(trimmedName)
         do {
-            try FileManager.default.moveItem(at: entry.url, to: destination)
+            try FileManager.default.moveItem(at: url, to: destination)
             refreshFiles()
         } catch {
             showAlert(title: "重命名失败", message: error.localizedDescription)
@@ -1804,6 +1959,9 @@ extension SidebarWindowController: NSCollectionViewDataSource, NSCollectionViewD
         let item = collectionView.makeItem(withIdentifier: FileItemView.identifier, for: indexPath)
         if let fileItem = item as? FileItemView {
             fileItem.configure(with: shownFiles[indexPath.item], iconSize: settings.iconSize)
+            fileItem.onRenameCommit = { [weak self] url, newName in
+                self?.startRename(url: url, newName: newName)
+            }
         }
         return item
     }
@@ -1869,6 +2027,9 @@ extension SidebarWindowController: NSOutlineViewDataSource, NSOutlineViewDelegat
         let view = outlineView.makeView(withIdentifier: FileListRowView.identifier, owner: self) as? FileListRowView ?? FileListRowView()
         view.identifier = FileListRowView.identifier
         view.configure(entry: node.entry, depth: outlineView.level(forItem: item))
+        view.onRenameCommit = { [weak self] url, newName in
+            self?.startRename(url: url, newName: newName)
+        }
         return view
     }
 

@@ -1,11 +1,15 @@
 import AppKit
 
-final class FileListRowView: NSTableCellView {
+final class FileListRowView: NSTableCellView, NSTextFieldDelegate {
     static let identifier = NSUserInterfaceItemIdentifier("FileListRowView")
 
     private let iconView = NSImageView()
     private let nameLabel = NSTextField(labelWithString: "")
+    private let renameField = NSTextField()
     private let detailLabel = NSTextField(labelWithString: "")
+    private var representedURL: URL?
+    private var isRenaming = false
+    var onRenameCommit: ((URL, String) -> Void)?
     var isDropHovered: Bool = false {
         didSet { updateHoverState() }
     }
@@ -31,6 +35,14 @@ final class FileListRowView: NSTableCellView {
         nameLabel.lineBreakMode = .byTruncatingMiddle
         nameLabel.font = .systemFont(ofSize: 13, weight: .medium)
 
+        renameField.translatesAutoresizingMaskIntoConstraints = false
+        renameField.isHidden = true
+        renameField.bezelStyle = .roundedBezel
+        renameField.font = nameLabel.font
+        renameField.target = self
+        renameField.action = #selector(commitRename)
+        renameField.delegate = self
+
         detailLabel.translatesAutoresizingMaskIntoConstraints = false
         detailLabel.lineBreakMode = .byTruncatingMiddle
         detailLabel.alignment = .right
@@ -39,6 +51,7 @@ final class FileListRowView: NSTableCellView {
 
         addSubview(iconView)
         addSubview(nameLabel)
+        addSubview(renameField)
         addSubview(detailLabel)
 
         NSLayoutConstraint.activate([
@@ -51,6 +64,10 @@ final class FileListRowView: NSTableCellView {
             nameLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
             nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: detailLabel.leadingAnchor, constant: -10),
 
+            renameField.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            renameField.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
+            renameField.centerYAnchor.constraint(equalTo: centerYAnchor),
+
             detailLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             detailLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
             detailLabel.widthAnchor.constraint(equalToConstant: 92)
@@ -59,11 +76,49 @@ final class FileListRowView: NSTableCellView {
 
     func configure(entry: FileEntry, depth: Int) {
         isDropHovered = false
+        representedURL = entry.url
+        nameLabel.isHidden = false
+        renameField.isHidden = true
         let icon = NSWorkspace.shared.icon(forFile: entry.url.path)
         icon.size = NSSize(width: 22, height: 22)
         iconView.image = icon
         nameLabel.stringValue = entry.name
         detailLabel.stringValue = entry.isDirectory ? "文件夹" : entry.kind.rawValue
+    }
+
+    func beginRenaming() {
+        guard let window else { return }
+        isRenaming = true
+        renameField.stringValue = nameLabel.stringValue
+        nameLabel.isHidden = true
+        renameField.isHidden = false
+        window.makeFirstResponder(renameField)
+        renameField.currentEditor()?.selectAll(nil)
+    }
+
+    @objc private func commitRename() {
+        finishRenaming(shouldCommit: true)
+    }
+
+    private func finishRenaming(shouldCommit: Bool) {
+        guard isRenaming else { return }
+        isRenaming = false
+        renameField.isHidden = true
+        nameLabel.isHidden = false
+        guard shouldCommit,
+              let representedURL,
+              !renameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+        onRenameCommit?(representedURL, renameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        finishRenaming(shouldCommit: false)
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        finishRenaming(shouldCommit: true)
     }
 
     private func updateHoverState() {

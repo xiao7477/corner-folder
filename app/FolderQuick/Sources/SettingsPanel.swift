@@ -12,6 +12,7 @@ final class SettingsPanel: NSPanel {
     private let autoHideSlider = NSSlider(value: 0.35, minValue: 0.1, maxValue: 1.2, target: nil, action: nil)
     private let edgeEnabledButton = NSButton(checkboxWithTitle: "启用边缘触发", target: nil, action: nil)
     private let edgeDebugButton = NSButton(checkboxWithTitle: "显示边缘触发条", target: nil, action: nil)
+    private let edgeHidePinnedButton = NSButton(checkboxWithTitle: "置顶时再次碰到边缘触发条则隐藏窗口", target: nil, action: nil)
     private let bottomPathButton = NSButton(checkboxWithTitle: "底部显示当前目录路径", target: nil, action: nil)
     private let opacityValue = NSTextField(labelWithString: "")
     private let iconSizeValue = NSTextField(labelWithString: "")
@@ -21,7 +22,7 @@ final class SettingsPanel: NSPanel {
     init(settings: AppSettings) {
         self.settings = settings
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 560),
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 592),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -79,6 +80,10 @@ final class SettingsPanel: NSPanel {
         edgeDebugButton.target = self
         edgeDebugButton.action = #selector(controlChanged)
         stack.addArrangedSubview(edgeDebugButton)
+
+        edgeHidePinnedButton.target = self
+        edgeHidePinnedButton.action = #selector(controlChanged)
+        stack.addArrangedSubview(edgeHidePinnedButton)
 
         bottomPathButton.target = self
         bottomPathButton.action = #selector(controlChanged)
@@ -163,6 +168,7 @@ final class SettingsPanel: NSPanel {
         autoHideSlider.doubleValue = settings.autoHideDelay
         edgeEnabledButton.state = settings.edgeTriggerEnabled ? .on : .off
         edgeDebugButton.state = settings.showEdgeTrigger ? .on : .off
+        edgeHidePinnedButton.state = settings.hidePinnedWindowOnEdgeTrigger == true ? .on : .off
         bottomPathButton.state = settings.showBottomPath ? .on : .off
         refreshValueLabels()
     }
@@ -186,6 +192,7 @@ final class SettingsPanel: NSPanel {
         settings.autoHideDelay = autoHideSlider.doubleValue
         settings.edgeTriggerEnabled = edgeEnabledButton.state == .on
         settings.showEdgeTrigger = edgeDebugButton.state == .on
+        settings.hidePinnedWindowOnEdgeTrigger = edgeHidePinnedButton.state == .on
         settings.showBottomPath = bottomPathButton.state == .on
         refreshValueLabels()
         onSettingsChanged?(settings)

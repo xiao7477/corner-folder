@@ -5,6 +5,8 @@ final class FileCollectionView: NSCollectionView {
     var onDoubleClickItem: ((IndexPath) -> Void)?
     var onDropFiles: (([URL], IndexPath?) -> Bool)?
     var onHoverItem: ((IndexPath?) -> Void)?
+    var onEmptyClick: (() -> Void)?
+    private var lastClickedIndexPath: IndexPath?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -18,17 +20,31 @@ final class FileCollectionView: NSCollectionView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        if event.clickCount == 2, let indexPath = indexPathForItem(at: point) {
+        guard let indexPath = finderLikeIndexPath(at: point) else {
+            selectionIndexPaths = []
+            lastClickedIndexPath = nil
+            onEmptyClick?()
+            super.mouseDown(with: event)
+            return
+        }
+
+        updateSelection(for: indexPath, event: event)
+
+        if event.clickCount == 2 {
             onDoubleClickItem?(indexPath)
             return
         }
-        super.mouseDown(with: event)
+
+        if indexPathForItem(at: point) != nil {
+            super.mouseDown(with: event)
+        }
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let point = convert(event.locationInWindow, from: nil)
-        if let indexPath = indexPathForItem(at: point), !selectionIndexPaths.contains(indexPath) {
+        if let indexPath = finderLikeIndexPath(at: point), !selectionIndexPaths.contains(indexPath) {
             selectionIndexPaths = [indexPath]
+            lastClickedIndexPath = indexPath
         }
         return menuProvider?()
     }
@@ -71,6 +87,47 @@ final class FileCollectionView: NSCollectionView {
 
     private func dropIndexPath(for sender: NSDraggingInfo) -> IndexPath? {
         let point = convert(sender.draggingLocation, from: nil)
-        return indexPathForItem(at: point)
+        return finderLikeIndexPath(at: point)
+    }
+
+    private func finderLikeIndexPath(at point: NSPoint) -> IndexPath? {
+        if let indexPath = indexPathForItem(at: point) {
+            return indexPath
+        }
+
+        guard let layoutAttributes = collectionViewLayout?.layoutAttributesForElements(in: visibleRect) else {
+            return nil
+        }
+
+        return layoutAttributes
+            .filter { $0.representedElementCategory == .item && $0.frame.contains(point) }
+            .sorted { $0.frame.minY == $1.frame.minY ? $0.frame.minX < $1.frame.minX : $0.frame.minY > $1.frame.minY }
+            .first?
+            .indexPath
+    }
+
+    private func updateSelection(for indexPath: IndexPath, event: NSEvent) {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        if modifiers.contains(.command) {
+            if selectionIndexPaths.contains(indexPath) {
+                selectionIndexPaths.remove(indexPath)
+            } else {
+                selectionIndexPaths.insert(indexPath)
+            }
+            lastClickedIndexPath = indexPath
+            return
+        }
+
+        if modifiers.contains(.shift),
+           let lastClickedIndexPath,
+           lastClickedIndexPath.section == indexPath.section {
+            let bounds = min(lastClickedIndexPath.item, indexPath.item)...max(lastClickedIndexPath.item, indexPath.item)
+            selectionIndexPaths = Set(bounds.map { IndexPath(item: $0, section: indexPath.section) })
+            return
+        }
+
+        selectionIndexPaths = [indexPath]
+        lastClickedIndexPath = indexPath
     }
 }

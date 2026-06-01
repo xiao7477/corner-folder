@@ -4,6 +4,7 @@ final class FileOutlineView: NSOutlineView {
     var menuProvider: (() -> NSMenu?)?
     var onDropFiles: (([URL], Int?) -> Bool)?
     var onHoverRow: ((Int?) -> Void)?
+    var onEmptyClick: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -13,6 +14,15 @@ final class FileOutlineView: NSOutlineView {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         registerForDraggedTypes(FilePasteboardReader.supportedTypes)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if row(at: point) < 0 {
+            deselectAll(nil)
+            onEmptyClick?()
+        }
+        super.mouseDown(with: event)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {

@@ -36,6 +36,7 @@ struct AppSettings: Codable, Equatable {
     var iconSpacing: Double = 12
     var edgeTriggerEnabled: Bool = true
     var showEdgeTrigger: Bool = false
+    var hidePinnedWindowOnEdgeTrigger: Bool? = false
     var showBottomPath: Bool = true
     var autoHideDelay: Double = 0.35
     var viewMode: FileViewMode = .grid
