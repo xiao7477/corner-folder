@@ -26,8 +26,22 @@ final class HorizontalTabScrollView: NSScrollView {
         let current = documentVisibleRect.origin
         let maxX = max(0, contentView.frame.width - documentVisibleRect.width)
         let delta = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) ? event.scrollingDeltaX : event.scrollingDeltaY
-        let nextX = min(max(0, current.x + delta), maxX)
+        let nextX = min(max(0, current.x + delta * 2.2), maxX)
         contentView.scroll(NSPoint(x: nextX, y: current.y))
+        reflectScrolledClipView(self.contentView)
+    }
+
+    func scrollTabRectToVisible(_ rect: NSRect) {
+        guard let contentView = documentView else { return }
+        let maxX = max(0, contentView.frame.width - documentVisibleRect.width)
+        var nextX = documentVisibleRect.origin.x
+        if rect.minX < documentVisibleRect.minX {
+            nextX = rect.minX - 10
+        } else if rect.maxX > documentVisibleRect.maxX {
+            nextX = rect.maxX - documentVisibleRect.width + 10
+        }
+        nextX = min(max(0, nextX), maxX)
+        contentView.scroll(NSPoint(x: nextX, y: documentVisibleRect.origin.y))
         reflectScrolledClipView(self.contentView)
     }
 }

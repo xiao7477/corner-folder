@@ -23,6 +23,7 @@
 		20A100000000000000000019 /* FileCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000019 /* FileCollectionView.swift */; };
 		20A100000000000000000020 /* FilePasteboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000020 /* FilePasteboardReader.swift */; };
 		20A100000000000000000021 /* FileDropScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000021 /* FileDropScrollView.swift */; };
+		20A100000000000000000022 /* FileTransferProgressPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000022 /* FileTransferProgressPanel.swift */; };
 		20A100000000000000000010 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000010 /* AppKit.framework */; };
 		20A100000000000000000011 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000011 /* Quartz.framework */; };
 		20A100000000000000000012 /* QuickLookThumbnailing.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000012 /* QuickLookThumbnailing.framework */; };
@@ -50,6 +51,7 @@
 		20A000000000000000000019 /* FileCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileCollectionView.swift; sourceTree = "<group>"; };
 		20A000000000000000000020 /* FilePasteboardReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePasteboardReader.swift; sourceTree = "<group>"; };
 		20A000000000000000000021 /* FileDropScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDropScrollView.swift; sourceTree = "<group>"; };
+		20A000000000000000000022 /* FileTransferProgressPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTransferProgressPanel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,6 +85,7 @@
 				20A000000000000000000002 /* FileItemView.swift */,
 				20A000000000000000000019 /* FileCollectionView.swift */,
 				20A000000000000000000021 /* FileDropScrollView.swift */,
+				20A000000000000000000022 /* FileTransferProgressPanel.swift */,
 				20A000000000000000000003 /* FileLoader.swift */,
 				20A000000000000000000020 /* FilePasteboardReader.swift */,
 				20A000000000000000000004 /* FolderStore.swift */,
@@ -200,6 +203,7 @@
 				20A100000000000000000019 /* FileCollectionView.swift in Sources */,
 				20A100000000000000000020 /* FilePasteboardReader.swift in Sources */,
 				20A100000000000000000021 /* FileDropScrollView.swift in Sources */,
+				20A100000000000000000022 /* FileTransferProgressPanel.swift in Sources */,
 				20A100000000000000000009 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

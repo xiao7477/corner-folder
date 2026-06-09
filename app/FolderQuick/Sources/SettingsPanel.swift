@@ -4,6 +4,8 @@ final class SettingsPanel: NSPanel {
     var onSettingsChanged: ((AppSettings) -> Void)?
 
     private var settings: AppSettings
+    private var hasPendingChanges = false
+    private var isApplyingSavedSettings = false
     private let positionButton = NSPopUpButton()
     private var triggerButtons: [NSButton] = []
     private let opacitySlider = NSSlider(value: 0.96, minValue: 0.55, maxValue: 1.0, target: nil, action: nil)
@@ -14,6 +16,8 @@ final class SettingsPanel: NSPanel {
     private let edgeDebugButton = NSButton(checkboxWithTitle: "显示边缘触发条", target: nil, action: nil)
     private let edgeHidePinnedButton = NSButton(checkboxWithTitle: "置顶时再次碰到边缘触发条则隐藏窗口", target: nil, action: nil)
     private let bottomPathButton = NSButton(checkboxWithTitle: "底部显示当前目录路径", target: nil, action: nil)
+    private let sidebarButton = NSButton(checkboxWithTitle: "显示左侧文件夹侧栏", target: nil, action: nil)
+    private var listInfoButtons: [NSButton] = []
     private let opacityValue = NSTextField(labelWithString: "")
     private let iconSizeValue = NSTextField(labelWithString: "")
     private let iconSpacingValue = NSTextField(labelWithString: "")
@@ -22,7 +26,7 @@ final class SettingsPanel: NSPanel {
     init(settings: AppSettings) {
         self.settings = settings
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 592),
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 680),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -36,7 +40,17 @@ final class SettingsPanel: NSPanel {
 
     func update(settings: AppSettings) {
         self.settings = settings
+        hasPendingChanges = false
         applySettingsToControls()
+    }
+
+    override func close() {
+        if hasPendingChanges && !isApplyingSavedSettings {
+            AppLogger.info("SettingsPanel close discarded pending changes")
+        }
+        hasPendingChanges = false
+        isApplyingSavedSettings = false
+        super.close()
     }
 
     private func buildInterface() {
@@ -89,10 +103,17 @@ final class SettingsPanel: NSPanel {
         bottomPathButton.action = #selector(controlChanged)
         stack.addArrangedSubview(bottomPathButton)
 
+        sidebarButton.target = self
+        sidebarButton.action = #selector(controlChanged)
+        stack.addArrangedSubview(sidebarButton)
+
+        stack.addArrangedSubview(listInfoSelector())
+
         let hint = NSTextField(labelWithString: "快捷键暂时固定为 ⌥⌘F。后续版本再支持自定义。")
         hint.font = .systemFont(ofSize: 12)
         hint.textColor = .secondaryLabelColor
         stack.addArrangedSubview(hint)
+        stack.addArrangedSubview(actionButtons())
 
         let wrapper = NSView()
         wrapper.addSubview(stack)
@@ -128,6 +149,25 @@ final class SettingsPanel: NSPanel {
         return stack
     }
 
+    private func actionButtons() -> NSView {
+        let cancel = NSButton(title: "取消", target: self, action: #selector(cancelSettings))
+        let save = NSButton(title: "保存设置", target: self, action: #selector(saveSettings))
+        save.keyEquivalent = "\r"
+        save.bezelStyle = .rounded
+        cancel.bezelStyle = .rounded
+
+        let spacer = NSView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        let stack = NSStackView(views: [spacer, cancel, save])
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 10
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.widthAnchor.constraint(equalToConstant: 512).isActive = true
+        spacer.widthAnchor.constraint(greaterThanOrEqualToConstant: 1).isActive = true
+        return stack
+    }
+
     private func triggerSelector() -> NSView {
         let title = NSTextField(labelWithString: "边缘触发条")
         title.font = .systemFont(ofSize: 13, weight: .medium)
@@ -156,6 +196,34 @@ final class SettingsPanel: NSPanel {
         return stack
     }
 
+    private func listInfoSelector() -> NSView {
+        let title = NSTextField(labelWithString: "列表显示信息")
+        title.font = .systemFont(ofSize: 13, weight: .medium)
+        title.widthAnchor.constraint(equalToConstant: 118).isActive = true
+
+        let grid = NSGridView()
+        grid.rowSpacing = 8
+        grid.columnSpacing = 10
+
+        listInfoButtons = ListInfoColumn.allCases.map { column in
+            let button = NSButton(checkboxWithTitle: column.rawValue, target: self, action: #selector(controlChanged))
+            button.tag = ListInfoColumn.allCases.firstIndex(of: column) ?? 0
+            return button
+        }
+
+        for row in 0..<2 {
+            let start = row * 2
+            let views = Array(listInfoButtons[start..<(start + 2)])
+            grid.addRow(with: views)
+        }
+
+        let stack = NSStackView(views: [title, grid])
+        stack.orientation = .horizontal
+        stack.alignment = .top
+        stack.spacing = 12
+        return stack
+    }
+
     private func applySettingsToControls() {
         positionButton.selectItem(at: WindowAnchor.allCases.firstIndex(of: settings.sidebarPosition) ?? 0)
         for button in triggerButtons {
@@ -170,6 +238,11 @@ final class SettingsPanel: NSPanel {
         edgeDebugButton.state = settings.showEdgeTrigger ? .on : .off
         edgeHidePinnedButton.state = settings.hidePinnedWindowOnEdgeTrigger == true ? .on : .off
         bottomPathButton.state = settings.showBottomPath ? .on : .off
+        sidebarButton.state = settings.showSidebar ? .on : .off
+        for button in listInfoButtons {
+            let column = ListInfoColumn.allCases[button.tag]
+            button.state = settings.listInfoColumns.contains(column) ? .on : .off
+        }
         refreshValueLabels()
     }
 
@@ -194,7 +267,27 @@ final class SettingsPanel: NSPanel {
         settings.showEdgeTrigger = edgeDebugButton.state == .on
         settings.hidePinnedWindowOnEdgeTrigger = edgeHidePinnedButton.state == .on
         settings.showBottomPath = bottomPathButton.state == .on
+        settings.showSidebar = sidebarButton.state == .on
+        let columns = listInfoButtons.compactMap { button -> ListInfoColumn? in
+            button.state == .on ? ListInfoColumn.allCases[button.tag] : nil
+        }
+        settings.listInfoColumns = columns.isEmpty ? [.kind] : columns
         refreshValueLabels()
-        onSettingsChanged?(settings)
+        hasPendingChanges = true
+        AppLogger.info("SettingsPanel changed pending settings")
+    }
+
+    @objc private func saveSettings() {
+        AppLogger.info("SettingsPanel save requested")
+        let nextSettings = settings
+        hasPendingChanges = false
+        isApplyingSavedSettings = true
+        onSettingsChanged?(nextSettings)
+        close()
+    }
+
+    @objc private func cancelSettings() {
+        AppLogger.info("SettingsPanel cancel requested")
+        close()
     }
 }

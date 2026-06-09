@@ -18,7 +18,10 @@ final class FolderTabButton: NSView, NSDraggingSource {
         didSet { updateJiggle() }
     }
     var onClick: ((Int) -> Void)?
+    var onMovePressChanged: ((Bool) -> Void)?
     var menuProvider: ((Int) -> NSMenu?)?
+    private var longPressWorkItem: DispatchWorkItem?
+    private var didLongPress = false
 
     override var acceptsFirstResponder: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
@@ -68,17 +71,27 @@ final class FolderTabButton: NSView, NSDraggingSource {
         if event.type == .rightMouseDown {
             return
         }
+        didLongPress = false
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.didLongPress = true
+            self.onMovePressChanged?(true)
+        }
+        longPressWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: workItem)
         guard !isMoveModeEnabled else { return }
         onClick?(folderIndex)
     }
 
     override func rightMouseDown(with event: NSEvent) {
+        longPressWorkItem?.cancel()
         guard let menu = menuProvider?(folderIndex) else { return }
         NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard isMoveModeEnabled else { return }
+        longPressWorkItem?.cancel()
         let pasteboardItem = NSPasteboardItem()
         pasteboardItem.setString("\(folderIndex)", forType: Self.pasteboardType)
         let item = NSDraggingItem(pasteboardWriter: pasteboardItem)
@@ -91,6 +104,22 @@ final class FolderTabButton: NSView, NSDraggingSource {
             return [component]
         }
         beginDraggingSession(with: [item], event: event, source: self)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        longPressWorkItem?.cancel()
+        longPressWorkItem = nil
+        if didLongPress {
+            onMovePressChanged?(false)
+        }
+        didLongPress = false
+        super.mouseUp(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        longPressWorkItem?.cancel()
+        longPressWorkItem = nil
+        super.mouseExited(with: event)
     }
 
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
@@ -127,7 +156,7 @@ final class FolderTabButton: NSView, NSDraggingSource {
 final class TabBarView: NSView {
     var onDropTab: ((Int, Int) -> Void)?
     var onHoverFileTab: ((Int?) -> Void)?
-    var onDropFilesOnTab: (([URL], Int) -> Bool)?
+    var onDropFilesOnTab: (([URL], Int, FileImportOperation) -> Bool)?
     override var mouseDownCanMoveWindow: Bool { false }
     private var insertionLineX: CGFloat? {
         didSet { needsDisplay = true }
@@ -150,7 +179,7 @@ final class TabBarView: NSView {
         }
         if isFileDrag(sender) {
             onHoverFileTab?(tabIndex(for: sender))
-            return .copy
+            return FileImportOperation.current().dragOperation
         }
         updateInsertionLine(sender)
         return .move
@@ -163,7 +192,7 @@ final class TabBarView: NSView {
         }
         if isFileDrag(sender) {
             onHoverFileTab?(tabIndex(for: sender))
-            return .copy
+            return FileImportOperation.current().dragOperation
         }
         updateInsertionLine(sender)
         return .move
@@ -186,7 +215,7 @@ final class TabBarView: NSView {
             let urls = FilePasteboardReader.fileURLs(from: sender.draggingPasteboard)
             guard !urls.isEmpty, let index = tabIndex(for: sender) else { return false }
             onHoverFileTab?(nil)
-            return onDropFilesOnTab?(urls, index) ?? false
+            return onDropFilesOnTab?(urls, index, FileImportOperation.current()) ?? false
         }
 
         guard let text = sender.draggingPasteboard.string(forType: FolderTabButton.pasteboardType),

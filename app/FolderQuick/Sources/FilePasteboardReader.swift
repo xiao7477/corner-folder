@@ -70,3 +70,19 @@ enum FolderQuickDragCancel {
         cancelled = false
     }
 }
+
+enum FileImportOperation {
+    case copy
+    case move
+
+    var dragOperation: NSDragOperation {
+        switch self {
+        case .copy: return .copy
+        case .move: return .move
+        }
+    }
+
+    static func current() -> FileImportOperation {
+        NSEvent.modifierFlags.contains(.option) ? .move : .copy
+    }
+}

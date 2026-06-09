@@ -70,7 +70,7 @@ final class FileListRowView: NSTableCellView, NSTextFieldDelegate {
 
             detailLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             detailLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-            detailLabel.widthAnchor.constraint(equalToConstant: 92)
+        detailLabel.widthAnchor.constraint(equalToConstant: 92)
         ])
     }
 
@@ -79,11 +79,12 @@ final class FileListRowView: NSTableCellView, NSTextFieldDelegate {
         representedURL = entry.url
         nameLabel.isHidden = false
         renameField.isHidden = true
+        detailLabel.isHidden = true
         let icon = NSWorkspace.shared.icon(forFile: entry.url.path)
         icon.size = NSSize(width: 22, height: 22)
         iconView.image = icon
         nameLabel.stringValue = entry.name
-        detailLabel.stringValue = entry.isDirectory ? "文件夹" : entry.kind.rawValue
+        detailLabel.stringValue = ""
     }
 
     func beginRenaming() {
@@ -125,6 +126,75 @@ final class FileListRowView: NSTableCellView, NSTextFieldDelegate {
         layer?.backgroundColor = isDropHovered ? NSColor.controlAccentColor.withAlphaComponent(0.24).cgColor : NSColor.clear.cgColor
         nameLabel.textColor = isDropHovered ? .controlAccentColor : .labelColor
         detailLabel.textColor = isDropHovered ? .controlAccentColor : .secondaryLabelColor
+    }
+}
+
+final class FileInfoCellView: NSTableCellView {
+    static let identifier = NSUserInterfaceItemIdentifier("FileInfoCellView")
+    private let label = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        build()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        build()
+    }
+
+    private func build() {
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.lineBreakMode = .byTruncatingMiddle
+        label.textColor = .secondaryLabelColor
+        label.font = .systemFont(ofSize: 12)
+        addSubview(label)
+
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+
+    func configure(text: String) {
+        label.stringValue = text
+    }
+}
+
+final class SidebarFolderRowView: NSTableCellView {
+    static let identifier = NSUserInterfaceItemIdentifier("SidebarFolderRowView")
+    private let nameLabel = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        build()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        build()
+    }
+
+    private func build() {
+        wantsLayer = true
+        layer?.cornerRadius = 5
+
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+        nameLabel.lineBreakMode = .byTruncatingMiddle
+        nameLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        nameLabel.textColor = .labelColor
+        addSubview(nameLabel)
+
+        NSLayoutConstraint.activate([
+            nameLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            nameLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            nameLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+
+    func configure(entry: FileEntry) {
+        nameLabel.stringValue = entry.name
     }
 }
 

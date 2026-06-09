@@ -10,6 +10,7 @@ final class FolderQuickApp: NSObject, NSApplicationDelegate {
     private var statusDragMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppLogger.info("Application did finish launching")
         controller = SidebarWindowController()
         hotkey = GlobalHotkey { [weak self] in
             DispatchQueue.main.async {
@@ -129,10 +130,12 @@ final class FolderQuickApp: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
+        AppLogger.info("Application quit requested")
         NSApplication.shared.terminate(nil)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        AppLogger.info("Application will terminate")
         if let statusDragMonitor {
             NSEvent.removeMonitor(statusDragMonitor)
         }

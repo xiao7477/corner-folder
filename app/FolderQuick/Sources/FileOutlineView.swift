@@ -1,8 +1,17 @@
 import AppKit
 
+final class FolderQuickTableHeaderView: NSTableHeaderView {
+    var menuProvider: (() -> NSMenu?)?
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        menuProvider?()
+    }
+}
+
 final class FileOutlineView: NSOutlineView {
     var menuProvider: (() -> NSMenu?)?
-    var onDropFiles: (([URL], Int?) -> Bool)?
+    var emptyMenuProvider: (() -> NSMenu?)?
+    var onDropFiles: (([URL], Int?, FileImportOperation) -> Bool)?
     var onHoverRow: ((Int?) -> Void)?
     var onEmptyClick: (() -> Void)?
 
@@ -28,7 +37,11 @@ final class FileOutlineView: NSOutlineView {
     override func menu(for event: NSEvent) -> NSMenu? {
         let point = convert(event.locationInWindow, from: nil)
         let row = row(at: point)
-        if row >= 0, !selectedRowIndexes.contains(row) {
+        guard row >= 0 else {
+            deselectAll(nil)
+            return emptyMenuProvider?()
+        }
+        if !selectedRowIndexes.contains(row) {
             selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
         }
         return menuProvider?()
@@ -58,7 +71,7 @@ final class FileOutlineView: NSOutlineView {
         guard !urls.isEmpty else { return false }
         let row = dropRow(for: sender)
         onHoverRow?(nil)
-        return onDropFiles?(urls, row) ?? false
+        return onDropFiles?(urls, row, FileImportOperation.current()) ?? false
     }
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
@@ -67,7 +80,7 @@ final class FileOutlineView: NSOutlineView {
     }
 
     private func dragOperation(for sender: NSDraggingInfo) -> NSDragOperation {
-        FilePasteboardReader.fileURLs(from: sender.draggingPasteboard).isEmpty ? [] : .copy
+        FilePasteboardReader.fileURLs(from: sender.draggingPasteboard).isEmpty ? [] : FileImportOperation.current().dragOperation
     }
 
     private func dropRow(for sender: NSDraggingInfo) -> Int? {

@@ -17,6 +17,7 @@ final class FileItemRootView: NSView {
 
 final class FileItemView: NSCollectionViewItem, NSTextFieldDelegate {
     static let identifier = NSUserInterfaceItemIdentifier("FileItemView")
+    private static let thumbnailCache = NSCache<NSString, NSImage>()
 
     private let thumbnailView = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
@@ -115,7 +116,7 @@ final class FileItemView: NSCollectionViewItem, NSTextFieldDelegate {
         titleLabel.font = .systemFont(ofSize: iconSize < 76 ? 11 : (iconSize >= 150 ? 14 : 13), weight: .medium)
         renameField.font = titleLabel.font
         thumbnailView.image = fallbackIcon(for: entry)
-        loadThumbnail(for: entry)
+        loadThumbnail(for: entry, iconSize: iconSize)
     }
 
     func beginRenaming() {
@@ -169,7 +170,14 @@ final class FileItemView: NSCollectionViewItem, NSTextFieldDelegate {
         return icon
     }
 
-    private func loadThumbnail(for entry: FileEntry) {
+    private func loadThumbnail(for entry: FileEntry, iconSize: Double) {
+        guard !entry.isDirectory else { return }
+        let cacheKey = thumbnailCacheKey(for: entry, iconSize: iconSize)
+        if let cachedImage = Self.thumbnailCache.object(forKey: cacheKey as NSString) {
+            thumbnailView.image = cachedImage
+            return
+        }
+
         let request = QLThumbnailGenerator.Request(
             fileAt: entry.url,
             size: CGSize(width: 512, height: 460),
@@ -182,7 +190,13 @@ final class FileItemView: NSCollectionViewItem, NSTextFieldDelegate {
             DispatchQueue.main.async {
                 guard self.representedURL == entry.url else { return }
                 self.thumbnailView.image = thumbnail.nsImage
+                Self.thumbnailCache.setObject(thumbnail.nsImage, forKey: cacheKey as NSString)
             }
         }
+    }
+
+    private func thumbnailCacheKey(for entry: FileEntry, iconSize: Double) -> String {
+        let modified = entry.modifiedAt?.timeIntervalSince1970 ?? 0
+        return "\(entry.url.path)|\(Int(modified))|\(Int(iconSize))"
     }
 }

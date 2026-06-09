@@ -2,6 +2,7 @@ import AppKit
 
 final class EdgeTriggerView: NSView {
     var onMouseEnter: (() -> Void)?
+    var onMouseExit: (() -> Void)?
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -16,5 +17,9 @@ final class EdgeTriggerView: NSView {
 
     override func mouseEntered(with event: NSEvent) {
         onMouseEnter?()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onMouseExit?()
     }
 }

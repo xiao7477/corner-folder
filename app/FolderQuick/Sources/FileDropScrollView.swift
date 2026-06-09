@@ -1,7 +1,7 @@
 import AppKit
 
 final class FileDropScrollView: NSScrollView {
-    var onDropFiles: (([URL]) -> Bool)?
+    var onDropFiles: (([URL], FileImportOperation) -> Bool)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -30,10 +30,10 @@ final class FileDropScrollView: NSScrollView {
         }
         let urls = FilePasteboardReader.fileURLs(from: sender.draggingPasteboard)
         guard !urls.isEmpty else { return false }
-        return onDropFiles?(urls) ?? false
+        return onDropFiles?(urls, FileImportOperation.current()) ?? false
     }
 
     private func dragOperation(for sender: NSDraggingInfo) -> NSDragOperation {
-        FilePasteboardReader.fileURLs(from: sender.draggingPasteboard).isEmpty ? [] : .copy
+        FilePasteboardReader.fileURLs(from: sender.draggingPasteboard).isEmpty ? [] : FileImportOperation.current().dragOperation
     }
 }

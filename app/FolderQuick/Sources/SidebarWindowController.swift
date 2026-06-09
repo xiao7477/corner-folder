@@ -63,7 +63,7 @@ final class FileHoverButton: NSButton {
         }
         isFileDropHovered = hovering
         onFileHover?(hovering)
-        return .copy
+        return FileImportOperation.current().dragOperation
     }
 }
 
@@ -76,6 +76,7 @@ final class SidebarWindowController: NSObject {
     private var panel: NSPanel!
     private var edgePanels: [NSPanel] = []
     private var rootView = NSVisualEffectView()
+    private var sidebarButton = NSButton()
     private var backButton = NSButton()
     private var rootButton = NSButton()
     private var refreshButton = NSButton()
@@ -93,12 +94,19 @@ final class SidebarWindowController: NSObject {
     private var scrollView = FileDropScrollView()
     private var outlineView = FileOutlineView()
     private var listScrollView = FileDropScrollView()
+    private var sidebarOutlineView = NSOutlineView()
+    private var sidebarScrollView = NSScrollView()
+    private var fileContentView = NSView()
+    private var sidebarWidthConstraint: NSLayoutConstraint?
+    private var transferProgressPanel = FileTransferProgressPanel()
     private var countLabel = NSTextField(labelWithString: "0 项")
     private var pathLabel = NSTextField(labelWithString: "未选择文件夹")
     private var levelDotsStack = NSStackView()
     private var settingsButton = NSButton()
     private var emptyLabel = NSTextField(labelWithString: "添加一个常用文件夹后开始使用")
     private var hideWorkItem: DispatchWorkItem?
+    private var edgeHideWorkItem: DispatchWorkItem?
+    private var lastEdgeShowDate: Date?
     private var hoverFolderWorkItem: DispatchWorkItem?
     private var hoveredDropFolderURL: URL?
     private var hoverTabWorkItem: DispatchWorkItem?
@@ -109,6 +117,11 @@ final class SidebarWindowController: NSObject {
     private var keyMonitor: Any?
     private var mouseMonitor: Any?
     private var dragCancelMonitors: [Any] = []
+    private let transferQueue = DispatchQueue(label: "local.folderquick.file-transfer", qos: .userInitiated)
+    private let fileLoadQueue = DispatchQueue(label: "local.folderquick.file-load", qos: .userInitiated)
+    private let filterQueue = DispatchQueue(label: "local.folderquick.file-filter", qos: .userInitiated)
+    private var fileLoadGeneration = 0
+    private var filterGeneration = 0
 
     private var folders: [FolderEntry] = []
     private var selectedFolderID: UUID?
@@ -118,6 +131,7 @@ final class SidebarWindowController: NSObject {
     private var allFiles: [FileEntry] = []
     private var shownFiles: [FileEntry] = []
     private var listRootNodes: [FileNode] = []
+    private var sidebarRootNodes: [FileNode] = []
     private var folderNavigationStates: [UUID: FolderNavigationState] = [:]
     private var isPinned = false
     private var isTabMoveMode = false
@@ -129,9 +143,16 @@ final class SidebarWindowController: NSObject {
         var expandedListPaths: Set<String>
     }
 
+    private struct FileImportTask {
+        let source: URL
+        let destination: URL
+        let operation: FileImportOperation
+    }
+
     override init() {
         settings = store.loadSettings()
         super.init()
+        AppLogger.info("SidebarWindowController init start")
         folders = store.loadFolders()
         selectedFolderID = store.selectedFolderID() ?? folders.first?.id
         buildWindow()
@@ -145,6 +166,7 @@ final class SidebarWindowController: NSObject {
         installDragCancelMonitors()
         reloadFolderMenu()
         loadSelectedFolder()
+        AppLogger.info("SidebarWindowController init finished")
     }
 
     deinit {
@@ -161,12 +183,14 @@ final class SidebarWindowController: NSObject {
         positionPanel(anchor: settings.sidebarPosition, screen: screenContainingMouse() ?? NSScreen.main)
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        lastEdgeShowDate = Date()
     }
 
     private func showWindow(anchor: WindowAnchor, screen: NSScreen) {
         positionPanel(anchor: anchor, screen: screen)
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        lastEdgeShowDate = Date()
     }
 
     func toggleWindow() {
@@ -178,6 +202,7 @@ final class SidebarWindowController: NSObject {
     }
 
     private func hideWindow() {
+        edgeHideWorkItem?.cancel()
         panel.orderOut(nil)
     }
 
@@ -199,6 +224,7 @@ final class SidebarWindowController: NSObject {
         panel.isOpaque = false
         panel.alphaValue = settings.opacity
         panel.delegate = self
+        panel.minSize = NSSize(width: 360, height: 420)
         panel.standardWindowButton(.closeButton)?.isHidden = true
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
@@ -236,28 +262,54 @@ final class SidebarWindowController: NSObject {
         triggerView.wantsLayer = true
         triggerView.layer?.backgroundColor = NSColor.clear.cgColor
         triggerView.onMouseEnter = { [weak self] in
-            self?.handleEdgeTrigger(anchor: anchor, screen: screen)
+            self?.handleEdgeTrigger(anchor: anchor, fallbackScreen: screen)
+        }
+        triggerView.onMouseExit = { [weak self] in
+            self?.cancelPendingEdgeHide()
         }
         edgePanel.contentView = triggerView
         return edgePanel
     }
 
-    private func handleEdgeTrigger(anchor: WindowAnchor, screen: NSScreen) {
+    private func handleEdgeTrigger(anchor: WindowAnchor, fallbackScreen: NSScreen) {
         if panel.isVisible, isPinned {
             if settings.hidePinnedWindowOnEdgeTrigger == true {
-                hideWindow()
+                schedulePinnedEdgeHide()
             }
             return
         }
 
-        showWindow(anchor: anchor, screen: screen)
+        let targetScreen = screenContainingMouse() ?? fallbackScreen
+        showWindow(anchor: anchor, screen: targetScreen)
+    }
+
+    private func schedulePinnedEdgeHide() {
+        if let lastEdgeShowDate, Date().timeIntervalSince(lastEdgeShowDate) < 0.9 {
+            return
+        }
+
+        edgeHideWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.hideWindow()
+        }
+        edgeHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7, execute: workItem)
+    }
+
+    private func cancelPendingEdgeHide() {
+        edgeHideWorkItem?.cancel()
+        edgeHideWorkItem = nil
     }
 
     private func rebuildEdgeTriggers() {
+        AppLogger.info("rebuildEdgeTriggers start enabled=\(settings.edgeTriggerEnabled) positions=\(settings.triggerPositions.map(\.rawValue).joined(separator: ","))")
         edgePanels.forEach { $0.orderOut(nil) }
         edgePanels = []
 
-        guard settings.edgeTriggerEnabled else { return }
+        guard settings.edgeTriggerEnabled else {
+            AppLogger.info("rebuildEdgeTriggers skipped disabled")
+            return
+        }
         for screen in NSScreen.screens {
             for anchor in settings.triggerPositions {
                 let trigger = makeEdgeTrigger(anchor: anchor, screen: screen)
@@ -265,6 +317,7 @@ final class SidebarWindowController: NSObject {
                 trigger.orderFrontRegardless()
             }
         }
+        AppLogger.info("rebuildEdgeTriggers finished count=\(edgePanels.count)")
     }
 
     private func buildInterface() {
@@ -306,8 +359,8 @@ final class SidebarWindowController: NSObject {
         tabBarView.onHoverFileTab = { [weak self] index in
             self?.handleTabDropHover(index: index)
         }
-        tabBarView.onDropFilesOnTab = { [weak self] urls, index in
-            self?.importFiles(urls, to: self?.dropDestinationForTab(index: index)) ?? false
+        tabBarView.onDropFilesOnTab = { [weak self] urls, index, operation in
+            self?.importFiles(urls, to: self?.dropDestinationForTab(index: index), operation: operation) ?? false
         }
 
         backButton = iconButton("chevron.left", action: #selector(goBack))
@@ -383,6 +436,8 @@ final class SidebarWindowController: NSObject {
         typeButton.target = self
         typeButton.action = #selector(applyFilters)
 
+        sidebarButton = iconButton("sidebar.left", action: #selector(toggleSidebarFromToolbar))
+        updateSidebarButtonState()
         backButton = hoverIconButton("chevron.left", action: #selector(goBack))
         (backButton as? FileHoverButton)?.onFileHover = { [weak self] isHovering in
             self?.handleBackDropHover(isHovering: isHovering)
@@ -391,17 +446,22 @@ final class SidebarWindowController: NSObject {
         viewModeControl.target = self
         viewModeControl.action = #selector(viewModeChanged)
 
-        let stack = NSStackView(views: [backButton, searchField, timeButton, typeButton, viewModeControl])
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 10
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        bar.addSubview(stack)
+        let leftStack = NSStackView(views: [sidebarButton, backButton, searchField])
+        leftStack.orientation = .horizontal
+        leftStack.alignment = .centerY
+        leftStack.spacing = 8
+        leftStack.translatesAutoresizingMaskIntoConstraints = false
+
+        viewModeControl.translatesAutoresizingMaskIntoConstraints = false
+        bar.addSubview(leftStack)
+        bar.addSubview(viewModeControl)
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 12),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: bar.trailingAnchor, constant: -12),
-            stack.centerYAnchor.constraint(equalTo: bar.centerYAnchor)
+            leftStack.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 12),
+            leftStack.trailingAnchor.constraint(lessThanOrEqualTo: viewModeControl.leadingAnchor, constant: -12),
+            leftStack.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            viewModeControl.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -14),
+            viewModeControl.centerYAnchor.constraint(equalTo: bar.centerYAnchor)
         ])
 
         return bar
@@ -424,16 +484,19 @@ final class SidebarWindowController: NSObject {
         collectionView.isSelectable = true
         collectionView.allowsMultipleSelection = true
         collectionView.backgroundColors = [.clear]
-        collectionView.setDraggingSourceOperationMask(.copy, forLocal: false)
+        collectionView.setDraggingSourceOperationMask([.copy, .move], forLocal: false)
         collectionView.menuProvider = { [weak self] in
             self?.primarySelectedEntry() == nil ? nil : self?.fileMenu()
+        }
+        collectionView.emptyMenuProvider = { [weak self] in
+            self?.emptyAreaMenu()
         }
         collectionView.onDoubleClickItem = { [weak self] indexPath in
             self?.openGridItem(at: indexPath)
         }
-        collectionView.onDropFiles = { [weak self] urls, indexPath in
+        collectionView.onDropFiles = { [weak self] urls, indexPath, operation in
             guard let self else { return false }
-            return self.importFiles(urls, to: self.dropDestinationForGrid(indexPath: indexPath))
+            return self.importFiles(urls, to: self.dropDestinationForGrid(indexPath: indexPath), operation: operation)
         }
         collectionView.onHoverItem = { [weak self] indexPath in
             self?.handleGridDropHover(indexPath: indexPath)
@@ -441,22 +504,28 @@ final class SidebarWindowController: NSObject {
         collectionView.onEmptyClick = { [weak self] in
             self?.closePreviewPanel()
         }
-        scrollView.onDropFiles = { [weak self] urls in
-            self?.importFiles(urls) ?? false
+        collectionView.dragURLsProvider = { [weak self] in
+            self?.selectedURLs() ?? []
+        }
+        collectionView.isDropTargetProvider = { [weak self] indexPath in
+            guard let self, self.shownFiles.indices.contains(indexPath.item) else { return false }
+            return self.shownFiles[indexPath.item].isDirectory
+        }
+        scrollView.onDropFiles = { [weak self] urls, operation in
+            self?.importFiles(urls, operation: operation) ?? false
         }
 
         scrollView.documentView = collectionView
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
         scrollView.translatesAutoresizingMaskIntoConstraints = false
 
-        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
-        column.title = "名称"
-        outlineView.addTableColumn(column)
-        outlineView.outlineTableColumn = column
-        outlineView.headerView = nil
+        configureListColumns()
         outlineView.rowHeight = 30
         outlineView.backgroundColor = .clear
+        outlineView.columnAutoresizingStyle = .noColumnAutoresizing
         outlineView.delegate = self
         outlineView.dataSource = self
         outlineView.target = self
@@ -464,9 +533,12 @@ final class SidebarWindowController: NSObject {
         outlineView.menuProvider = { [weak self] in
             self?.fileMenu()
         }
-        outlineView.onDropFiles = { [weak self] urls, row in
+        outlineView.emptyMenuProvider = { [weak self] in
+            self?.emptyAreaMenu()
+        }
+        outlineView.onDropFiles = { [weak self] urls, row, operation in
             guard let self else { return false }
-            return self.importFiles(urls, to: self.dropDestinationForList(row: row))
+            return self.importFiles(urls, to: self.dropDestinationForList(row: row), operation: operation)
         }
         outlineView.onHoverRow = { [weak self] row in
             self?.handleListDropHover(row: row)
@@ -474,36 +546,73 @@ final class SidebarWindowController: NSObject {
         outlineView.onEmptyClick = { [weak self] in
             self?.closePreviewPanel()
         }
-        outlineView.setDraggingSourceOperationMask(.copy, forLocal: false)
-        outlineView.setDraggingSourceOperationMask(.copy, forLocal: true)
-        listScrollView.onDropFiles = { [weak self] urls in
-            self?.importFiles(urls) ?? false
+        outlineView.setDraggingSourceOperationMask([.copy, .move], forLocal: false)
+        outlineView.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
+        listScrollView.onDropFiles = { [weak self] urls, operation in
+            self?.importFiles(urls, operation: operation) ?? false
         }
         outlineView.usesAlternatingRowBackgroundColors = false
         outlineView.allowsMultipleSelection = true
         listScrollView.documentView = outlineView
         listScrollView.drawsBackground = false
         listScrollView.hasVerticalScroller = true
+        listScrollView.hasHorizontalScroller = false
+        listScrollView.autohidesScrollers = true
+        listScrollView.scrollerStyle = .overlay
         listScrollView.translatesAutoresizingMaskIntoConstraints = false
+
+        let sidebarColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("sidebar"))
+        sidebarColumn.title = "文件夹"
+        sidebarOutlineView.addTableColumn(sidebarColumn)
+        sidebarOutlineView.outlineTableColumn = sidebarColumn
+        sidebarOutlineView.headerView = nil
+        sidebarOutlineView.rowHeight = 28
+        sidebarOutlineView.backgroundColor = .clear
+        sidebarOutlineView.delegate = self
+        sidebarOutlineView.dataSource = self
+        sidebarOutlineView.target = self
+        sidebarOutlineView.doubleAction = #selector(sidebarDoubleClicked)
+        sidebarOutlineView.selectionHighlightStyle = .regular
+        sidebarScrollView.documentView = sidebarOutlineView
+        sidebarScrollView.drawsBackground = false
+        sidebarScrollView.hasVerticalScroller = true
+        sidebarScrollView.hasHorizontalScroller = false
+        sidebarScrollView.autohidesScrollers = true
+        sidebarScrollView.scrollerStyle = .overlay
+        sidebarScrollView.translatesAutoresizingMaskIntoConstraints = false
 
         emptyLabel.font = .systemFont(ofSize: 16, weight: .medium)
         emptyLabel.textColor = .secondaryLabelColor
         emptyLabel.alignment = .center
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        container.addSubview(scrollView)
-        container.addSubview(listScrollView)
+        fileContentView.translatesAutoresizingMaskIntoConstraints = false
+        fileContentView.addSubview(scrollView)
+        fileContentView.addSubview(listScrollView)
+
+        sidebarWidthConstraint = sidebarScrollView.widthAnchor.constraint(equalToConstant: settings.showSidebar ? 190 : 0)
+
+        container.addSubview(sidebarScrollView)
+        container.addSubview(fileContentView)
         container.addSubview(emptyLabel)
 
         NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: container.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            listScrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            listScrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            listScrollView.topAnchor.constraint(equalTo: container.topAnchor),
-            listScrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            sidebarScrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            sidebarScrollView.topAnchor.constraint(equalTo: container.topAnchor),
+            sidebarScrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            sidebarWidthConstraint!,
+            fileContentView.leadingAnchor.constraint(equalTo: sidebarScrollView.trailingAnchor),
+            fileContentView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            fileContentView.topAnchor.constraint(equalTo: container.topAnchor),
+            fileContentView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: fileContentView.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: fileContentView.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: fileContentView.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: fileContentView.bottomAnchor),
+            listScrollView.leadingAnchor.constraint(equalTo: fileContentView.leadingAnchor),
+            listScrollView.trailingAnchor.constraint(equalTo: fileContentView.trailingAnchor),
+            listScrollView.topAnchor.constraint(equalTo: fileContentView.topAnchor),
+            listScrollView.bottomAnchor.constraint(equalTo: fileContentView.bottomAnchor),
             emptyLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
             emptyLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor)
         ])
@@ -511,6 +620,62 @@ final class SidebarWindowController: NSObject {
         updateContentMode()
 
         return container
+    }
+
+    private func configureListColumns() {
+        while let column = outlineView.tableColumns.first {
+            outlineView.removeTableColumn(column)
+        }
+
+        let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+        nameColumn.title = sortTitle("名称", mode: .name)
+        nameColumn.minWidth = 220
+        nameColumn.width = 320
+        nameColumn.resizingMask = .userResizingMask
+        outlineView.addTableColumn(nameColumn)
+        outlineView.outlineTableColumn = nameColumn
+
+        for infoColumn in settings.listInfoColumns {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(infoColumn.rawValue))
+            column.title = sortTitle(infoColumn.rawValue, mode: sortMode(for: infoColumn))
+            column.minWidth = infoColumn == .size ? 78 : 110
+            column.width = infoColumn == .size ? 92 : 142
+            column.resizingMask = .userResizingMask
+            outlineView.addTableColumn(column)
+        }
+        let headerView = FolderQuickTableHeaderView()
+        headerView.menuProvider = { [weak self] in
+            self?.emptyAreaMenu()
+        }
+        outlineView.headerView = headerView
+    }
+
+    private func updateListColumnTitles() {
+        for column in outlineView.tableColumns {
+            if column.identifier.rawValue == "name" {
+                column.title = sortTitle("名称", mode: .name)
+            } else if let infoColumn = ListInfoColumn(rawValue: column.identifier.rawValue) {
+                column.title = sortTitle(infoColumn.rawValue, mode: sortMode(for: infoColumn))
+            }
+        }
+    }
+
+    private func sortTitle(_ title: String, mode: FileSortMode) -> String {
+        guard settings.sortMode == mode else { return title }
+        return "\(title) \(settings.sortAscending ? "⌃" : "⌄")"
+    }
+
+    private func sortMode(for column: ListInfoColumn) -> FileSortMode {
+        switch column {
+        case .kind:
+            return .kind
+        case .dateModified:
+            return .dateModified
+        case .dateCreated:
+            return .dateCreated
+        case .size:
+            return .size
+        }
     }
 
     private func makeBottomBar() -> NSView {
@@ -618,7 +783,7 @@ final class SidebarWindowController: NSObject {
         let frame = screen.frame
         let length = 420.0
         let thickness = 8.0
-        let corner = 72.0
+        let corner = 34.0
         switch anchor {
         case .left:
             return NSRect(x: frame.minX, y: frame.midY - length / 2, width: thickness, height: length)
@@ -683,6 +848,9 @@ final class SidebarWindowController: NSObject {
             button.onClick = { [weak self] index in
                 self?.selectFolderTab(index: index)
             }
+            button.onMovePressChanged = { [weak self] isPressed in
+                self?.setTabMoveMode(isPressed)
+            }
             button.menuProvider = { [weak self] index in
                 self?.folderMenu(index: index)
             }
@@ -692,6 +860,18 @@ final class SidebarWindowController: NSObject {
             x += width + 6
         }
         tabBarView.frame = NSRect(x: 0, y: 0, width: max(x, tabScrollView.contentSize.width), height: 34)
+        DispatchQueue.main.async { [weak self] in
+            self?.scrollSelectedTabIntoView()
+        }
+    }
+
+    private func scrollSelectedTabIntoView() {
+        guard let selectedFolderID,
+              let index = folders.firstIndex(where: { $0.id == selectedFolderID }),
+              let button = tabBarView.subviews
+                .compactMap({ $0 as? FolderTabButton })
+                .first(where: { $0.folderIndex == index }) else { return }
+        tabScrollView.scrollTabRectToVisible(button.frame)
     }
 
     private func loadSelectedFolder() {
@@ -717,9 +897,8 @@ final class SidebarWindowController: NSObject {
             navigationStack = []
             saveCurrentFolderState()
         }
-        reloadFiles(from: currentFolderURL ?? url)
+        reloadFiles(from: currentFolderURL ?? url, rebuildSidebar: true)
         reloadTabs()
-        applyFilters()
     }
 
     private func saveCurrentFolderState() {
@@ -741,12 +920,12 @@ final class SidebarWindowController: NSObject {
         selectedRootURL = rootURL
         currentFolderURL = rootURL
         navigationStack = []
-        reloadFiles(from: rootURL)
+        reloadFiles(from: rootURL, rebuildSidebar: true)
         reloadTabs()
-        applyFilters()
     }
 
     private func refreshCollection() {
+        AppLogger.info("refreshCollection start all=\(allFiles.count) shown=\(shownFiles.count) mode=\(settings.viewMode.rawValue)")
         emptyLabel.isHidden = !shownFiles.isEmpty || (!folders.isEmpty && !allFiles.isEmpty)
         if folders.isEmpty {
             emptyLabel.stringValue = "添加一个常用文件夹后开始使用"
@@ -765,10 +944,57 @@ final class SidebarWindowController: NSObject {
         collectionView.reloadData()
         outlineView.reloadData()
         restoreExpandedListState()
+        AppLogger.info("refreshCollection finished")
     }
 
-    private func reloadFiles(from url: URL) {
-        allFiles = loader.loadFiles(in: url)
+    private func reloadFiles(from url: URL, rebuildSidebar: Bool = false) {
+        AppLogger.info("reloadFiles requested path=\(url.path) rebuildSidebar=\(rebuildSidebar)")
+        fileLoadGeneration += 1
+        filterGeneration += 1
+        let generation = fileLoadGeneration
+        let loader = self.loader
+
+        allFiles = []
+        shownFiles = []
+        listRootNodes = []
+        collectionView.reloadData()
+        outlineView.reloadData()
+        countLabel.stringValue = "读取中"
+        emptyLabel.stringValue = "正在读取文件..."
+        emptyLabel.isHidden = false
+
+        fileLoadQueue.async { [weak self] in
+            AppLogger.info("reloadFiles background start path=\(url.path)")
+            let files = loader.loadFiles(in: url)
+            AppLogger.info("reloadFiles background finished path=\(url.path) count=\(files.count)")
+            DispatchQueue.main.async {
+                guard let self,
+                      self.fileLoadGeneration == generation,
+                      self.currentFolderURL == url else {
+                    AppLogger.info("reloadFiles result ignored path=\(url.path)")
+                    return
+                }
+                self.allFiles = files
+                if rebuildSidebar {
+                    self.rebuildSidebarNodes()
+                }
+                self.applyFilters()
+            }
+        }
+    }
+
+    private func rebuildSidebarNodes() {
+        guard let selectedRootURL else {
+            sidebarRootNodes = []
+            sidebarOutlineView.reloadData()
+            return
+        }
+        let rootEntry = FileEntry.make(url: selectedRootURL)
+        sidebarRootNodes = [FileNode(entry: rootEntry)]
+        sidebarOutlineView.reloadData()
+        if let root = sidebarRootNodes.first {
+            sidebarOutlineView.expandItem(root)
+        }
     }
 
     private func updatePathLabel() {
@@ -806,8 +1032,16 @@ final class SidebarWindowController: NSObject {
         let showList = settings.viewMode == .list
         scrollView.isHidden = showList
         listScrollView.isHidden = !showList
+        sidebarScrollView.isHidden = !settings.showSidebar
+        applySidebarWidth()
         viewModeControl.selectedSegment = FileViewMode.allCases.firstIndex(of: settings.viewMode) ?? 0
+        updateSidebarButtonState()
         updateLevelDots()
+    }
+
+    private func applySidebarWidth() {
+        sidebarWidthConstraint?.constant = settings.showSidebar ? min(220, max(170, panel.frame.width * 0.16)) : 0
+        fileContentView.needsLayout = true
     }
 
     private func navigationPathURLs() -> [URL] {
@@ -914,6 +1148,21 @@ final class SidebarWindowController: NSObject {
             return []
         }
         let children = loader.loadFiles(in: node.entry.url).map { FileNode(entry: $0, parent: node) }
+        node.children = children
+        return children
+    }
+
+    private func loadSidebarChildren(for node: FileNode) -> [FileNode] {
+        if let children = node.children {
+            return children
+        }
+        guard node.entry.isDirectory else {
+            node.children = []
+            return []
+        }
+        let children = loader.loadFiles(in: node.entry.url)
+            .filter(\.isDirectory)
+            .map { FileNode(entry: $0, parent: node) }
         node.children = children
         return children
     }
@@ -1064,7 +1313,6 @@ final class SidebarWindowController: NSObject {
         currentFolderURL = url
         saveCurrentFolderState()
         reloadFiles(from: url)
-        applyFilters()
     }
 
     private func dropDestinationForGrid(indexPath: IndexPath?) -> URL? {
@@ -1334,7 +1582,6 @@ final class SidebarWindowController: NSObject {
         currentFolderURL = previous
         saveCurrentFolderState()
         reloadFiles(from: previous)
-        applyFilters()
     }
 
     @objc private func goToNavigationLevel(_ sender: NSButton) {
@@ -1346,7 +1593,6 @@ final class SidebarWindowController: NSObject {
         navigationStack = Array(urls.prefix(sender.tag))
         saveCurrentFolderState()
         reloadFiles(from: targetURL)
-        applyFilters()
     }
 
     @objc private func goRoot() {
@@ -1355,13 +1601,11 @@ final class SidebarWindowController: NSObject {
         navigationStack = []
         saveCurrentFolderState()
         reloadFiles(from: selectedRootURL)
-        applyFilters()
     }
 
     @objc private func refreshFiles() {
         guard let currentFolderURL else { return }
-        reloadFiles(from: currentFolderURL)
-        applyFilters()
+        reloadFiles(from: currentFolderURL, rebuildSidebar: true)
     }
 
     @objc private func viewModeChanged() {
@@ -1371,7 +1615,12 @@ final class SidebarWindowController: NSObject {
         refreshCollection()
     }
 
+    @objc private func toggleSidebarFromToolbar() {
+        toggleSidebarVisibility()
+    }
+
     @objc private func openSettings() {
+        AppLogger.info("openSettings")
         settingsPanel.update(settings: settings)
         if let screen = panel.screen {
             settingsPanel.setFrameOrigin(NSPoint(
@@ -1386,18 +1635,81 @@ final class SidebarWindowController: NSObject {
     }
 
     @objc private func applyFilters() {
+        AppLogger.info("applyFilters requested all=\(allFiles.count)")
         let keyword = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         let selectedKind = FileKind.allCases.first { $0.rawValue == typeButton.titleOfSelectedItem } ?? .all
         let selectedTime = timeButton.titleOfSelectedItem ?? "全部时间"
+        let files = allFiles
+        let settingsSnapshot = settings
+        filterGeneration += 1
+        let generation = filterGeneration
 
-        shownFiles = allFiles.filter { entry in
+        filterQueue.async { [weak self] in
+            AppLogger.info("applyFilters background start count=\(files.count)")
+            let shown = Self.filteredAndSortedFiles(
+                files,
+                keyword: keyword,
+                selectedKind: selectedKind,
+                selectedTime: selectedTime,
+                settings: settingsSnapshot
+            )
+            AppLogger.info("applyFilters background finished shown=\(shown.count)")
+
+            DispatchQueue.main.async {
+                guard let self, self.filterGeneration == generation else {
+                    AppLogger.info("applyFilters result ignored")
+                    return
+                }
+                self.shownFiles = shown
+                self.refreshCollection()
+            }
+        }
+    }
+
+    private static func filteredAndSortedFiles(
+        _ entries: [FileEntry],
+        keyword: String,
+        selectedKind: FileKind,
+        selectedTime: String,
+        settings: AppSettings
+    ) -> [FileEntry] {
+        sortedFiles(entries.filter { entry in
             let matchesKeyword = keyword.isEmpty || entry.name.localizedCaseInsensitiveContains(keyword)
             let matchesKind = selectedKind == .all || entry.kind == selectedKind
             let matchesTime = matchesTimeFilter(entry.modifiedAt, title: selectedTime)
             return matchesKeyword && matchesKind && matchesTime
-        }
+        }, settings: settings)
+    }
 
-        refreshCollection()
+    private static func sortedFiles(_ entries: [FileEntry], settings: AppSettings) -> [FileEntry] {
+        let pinnedPaths = Set(settings.pinnedFilePaths)
+        return entries.sorted { left, right in
+            let leftPinned = pinnedPaths.contains(left.url.path)
+            let rightPinned = pinnedPaths.contains(right.url.path)
+            if leftPinned != rightPinned {
+                return leftPinned
+            }
+            if left.isDirectory != right.isDirectory {
+                return left.isDirectory && !right.isDirectory
+            }
+            let isAscending: Bool
+            switch settings.sortMode {
+            case .name:
+                isAscending = left.name.localizedStandardCompare(right.name) != .orderedDescending
+            case .kind:
+                let result = left.kind.rawValue.localizedStandardCompare(right.kind.rawValue)
+                isAscending = result == .orderedSame
+                    ? left.name.localizedStandardCompare(right.name) != .orderedDescending
+                    : result == .orderedAscending
+            case .dateModified:
+                isAscending = (left.modifiedAt ?? .distantPast) < (right.modifiedAt ?? .distantPast)
+            case .dateCreated:
+                isAscending = (left.createdAt ?? .distantPast) < (right.createdAt ?? .distantPast)
+            case .size:
+                isAscending = (left.fileSize ?? 0) < (right.fileSize ?? 0)
+            }
+            return settings.sortAscending ? isAscending : !isAscending
+        }
     }
 
     private func installKeyMonitor() {
@@ -1680,6 +1992,30 @@ final class SidebarWindowController: NSObject {
         NSPasteboard.general.setString(paths, forType: .string)
     }
 
+    private func pinnedMenuTitle() -> String {
+        let urls = selectedURLs()
+        guard !urls.isEmpty else { return "置顶文件" }
+        let pinnedPaths = Set(settings.pinnedFilePaths)
+        return urls.allSatisfy { pinnedPaths.contains($0.path) } ? "取消置顶" : "置顶文件"
+    }
+
+    @objc private func togglePinnedSelectedFiles() {
+        let urls = selectedURLs()
+        guard !urls.isEmpty else { return }
+        var pinnedPaths = Set(settings.pinnedFilePaths)
+        let shouldUnpin = urls.allSatisfy { pinnedPaths.contains($0.path) }
+        for url in urls {
+            if shouldUnpin {
+                pinnedPaths.remove(url.path)
+            } else {
+                pinnedPaths.insert(url.path)
+            }
+        }
+        settings.pinnedFilePaths = Array(pinnedPaths)
+        store.saveSettings(settings)
+        applyFilters()
+    }
+
     @objc private func pasteFilesIntoCurrentFolder() {
         guard currentFolderURL != nil else { return }
         let pasteboard = NSPasteboard.general
@@ -1689,31 +2025,197 @@ final class SidebarWindowController: NSObject {
     }
 
     @discardableResult
-    private func importFiles(_ urls: [URL]) -> Bool {
-        importFiles(urls, to: currentFolderURL)
+    private func importFiles(_ urls: [URL], operation: FileImportOperation = .copy) -> Bool {
+        importFiles(urls, to: currentFolderURL, operation: operation)
     }
 
     @discardableResult
-    private func importFiles(_ urls: [URL], to folderURL: URL?) -> Bool {
+    private func importFiles(_ urls: [URL], to folderURL: URL?, operation: FileImportOperation = .copy) -> Bool {
         guard let folderURL else { return false }
-        var didImport = false
+        let tasks = urls.compactMap { source -> FileImportTask? in
+            guard source.deletingLastPathComponent() != folderURL else { return nil }
+            guard let destination = resolvedImportDestination(for: source, in: folderURL) else { return nil }
+            return FileImportTask(source: source, destination: destination, operation: operation)
+        }
 
-        for source in urls {
-            guard source.deletingLastPathComponent() != folderURL else { continue }
-            guard let destination = resolvedImportDestination(for: source, in: folderURL) else { continue }
+        guard !tasks.isEmpty else { return false }
+        startImportTasks(tasks, targetFolderURL: folderURL, operation: operation)
+        return true
+    }
+
+    private func startImportTasks(_ tasks: [FileImportTask], targetFolderURL: URL, operation: FileImportOperation) {
+        let title = operation == .move ? "正在移动" : "正在复制"
+        transferProgressPanel.show(
+            on: panel.screen ?? screenContainingMouse(),
+            title: title,
+            detail: tasks.count == 1 ? tasks[0].source.lastPathComponent : "\(tasks.count) 个项目"
+        )
+
+        transferQueue.async { [weak self] in
+            guard let self else { return }
             do {
-                try FileManager.default.copyItem(at: source, to: destination)
-                didImport = true
+                let totalBytes = tasks.reduce(UInt64(0)) { partial, task in
+                    partial + self.transferSize(of: task.source)
+                }
+                var completedBytes: UInt64 = 0
+
+                for task in tasks {
+                    DispatchQueue.main.async {
+                        self.transferProgressPanel.update(
+                            title: title,
+                            detail: task.source.lastPathComponent,
+                            completed: completedBytes,
+                            total: totalBytes
+                        )
+                    }
+
+                    switch task.operation {
+                    case .copy:
+                        try self.copyItemWithProgress(
+                            from: task.source,
+                            to: task.destination,
+                            completedBytes: &completedBytes,
+                            totalBytes: totalBytes,
+                            title: title
+                        )
+                    case .move:
+                        let size = self.transferSize(of: task.source)
+                        try FileManager.default.moveItem(at: task.source, to: task.destination)
+                        completedBytes += size
+                        DispatchQueue.main.async {
+                            self.transferProgressPanel.update(
+                                title: title,
+                                detail: task.source.lastPathComponent,
+                                completed: completedBytes,
+                                total: totalBytes
+                            )
+                        }
+                    }
+                }
+
+                DispatchQueue.main.async {
+                    self.transferProgressPanel.finish(title: "完成", detail: "\(tasks.count) 个项目已处理")
+                    if targetFolderURL == self.currentFolderURL || operation == .move {
+                        self.refreshFiles()
+                    }
+                }
             } catch {
-                showAlert(title: "复制失败", message: error.localizedDescription)
+                DispatchQueue.main.async {
+                    self.transferProgressPanel.finish(title: operation == .move ? "移动失败" : "复制失败", detail: error.localizedDescription)
+                    self.showAlert(title: operation == .move ? "移动失败" : "复制失败", message: error.localizedDescription)
+                    if targetFolderURL == self.currentFolderURL || operation == .move {
+                        self.refreshFiles()
+                    }
+                }
             }
         }
-        if didImport {
-            if folderURL == currentFolderURL {
-                refreshFiles()
+    }
+
+    private func transferSize(of url: URL) -> UInt64 {
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey]
+        guard let values = try? url.resourceValues(forKeys: keys) else { return 0 }
+        if values.isDirectory == true {
+            guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles]) else {
+                return 0
             }
+            return enumerator.compactMap { item -> UInt64? in
+                guard let fileURL = item as? URL,
+                      let itemValues = try? fileURL.resourceValues(forKeys: keys),
+                      itemValues.isDirectory != true else { return nil }
+                return UInt64(itemValues.totalFileAllocatedSize ?? itemValues.fileSize ?? 0)
+            }.reduce(0, +)
         }
-        return didImport
+        return UInt64(values.totalFileAllocatedSize ?? values.fileSize ?? 0)
+    }
+
+    private func copyItemWithProgress(
+        from source: URL,
+        to destination: URL,
+        completedBytes: inout UInt64,
+        totalBytes: UInt64,
+        title: String
+    ) throws {
+        let values = try source.resourceValues(forKeys: [.isDirectoryKey])
+        if values.isDirectory == true {
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            guard let enumerator = FileManager.default.enumerator(
+                at: source,
+                includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey],
+                options: []
+            ) else { return }
+
+            for case let itemURL as URL in enumerator {
+                let relativePath = String(itemURL.path.dropFirst(source.path.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                guard !relativePath.isEmpty else { continue }
+                let itemDestination = destination.appendingPathComponent(relativePath)
+                let itemValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey])
+                if itemValues.isDirectory == true {
+                    try FileManager.default.createDirectory(at: itemDestination, withIntermediateDirectories: true)
+                } else {
+                    try copyFileWithProgress(
+                        from: itemURL,
+                        to: itemDestination,
+                        completedBytes: &completedBytes,
+                        totalBytes: totalBytes,
+                        title: title
+                    )
+                }
+            }
+            return
+        }
+
+        try copyFileWithProgress(
+            from: source,
+            to: destination,
+            completedBytes: &completedBytes,
+            totalBytes: totalBytes,
+            title: title
+        )
+    }
+
+    private func copyFileWithProgress(
+        from source: URL,
+        to destination: URL,
+        completedBytes: inout UInt64,
+        totalBytes: UInt64,
+        title: String
+    ) throws {
+        try FileManager.default.createDirectory(
+            at: destination.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        FileManager.default.createFile(atPath: destination.path, contents: nil)
+
+        let input = try FileHandle(forReadingFrom: source)
+        defer { try? input.close() }
+
+        let output = try FileHandle(forWritingTo: destination)
+        defer { try? output.close() }
+
+        let chunkSize = 1024 * 1024
+        var lastUpdate = Date(timeIntervalSince1970: 0)
+
+        while autoreleasepool(invoking: {
+            let data = input.readData(ofLength: chunkSize)
+            guard !data.isEmpty else { return false }
+            output.write(data)
+            completedBytes += UInt64(data.count)
+
+            let now = Date()
+            if now.timeIntervalSince(lastUpdate) > 0.08 {
+                lastUpdate = now
+                let currentCompleted = completedBytes
+                DispatchQueue.main.async {
+                    self.transferProgressPanel.update(
+                        title: title,
+                        detail: source.lastPathComponent,
+                        completed: currentCompleted,
+                        total: totalBytes
+                    )
+                }
+            }
+            return true
+        }) {}
     }
 
     private enum DuplicateChoice {
@@ -1778,6 +2280,8 @@ final class SidebarWindowController: NSObject {
         for url in urls {
             try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
         }
+        settings.pinnedFilePaths.removeAll { path in urls.contains(URL(fileURLWithPath: path)) }
+        store.saveSettings(settings)
         refreshFiles()
     }
 
@@ -1874,6 +2378,10 @@ final class SidebarWindowController: NSObject {
         info.target = self
         menu.addItem(info)
 
+        let pin = NSMenuItem(title: pinnedMenuTitle(), action: #selector(togglePinnedSelectedFiles), keyEquivalent: "")
+        pin.target = self
+        menu.addItem(pin)
+
         let trash = NSMenuItem(title: "删除到废纸篓", action: #selector(trashSelectedFiles), keyEquivalent: "")
         trash.target = self
         menu.addItem(trash)
@@ -1889,19 +2397,215 @@ final class SidebarWindowController: NSObject {
         return menu
     }
 
+    private func emptyAreaMenu() -> NSMenu {
+        let menu = NSMenu()
+
+        let newFolder = NSMenuItem(title: "新建文件夹", action: #selector(createFolderInCurrentDirectory), keyEquivalent: "")
+        newFolder.target = self
+        menu.addItem(newFolder)
+
+        let reveal = NSMenuItem(title: "在访达中显示", action: #selector(revealCurrentFolderInFinder), keyEquivalent: "")
+        reveal.target = self
+        menu.addItem(reveal)
+
+        let sortItem = NSMenuItem(title: "排列方式", action: nil, keyEquivalent: "")
+        let sortMenu = NSMenu()
+        for mode in FileSortMode.allCases {
+            let item = NSMenuItem(title: mode.rawValue, action: #selector(sortModeMenuItem(_:)), keyEquivalent: "")
+            item.representedObject = mode.rawValue
+            item.state = settings.sortMode == mode ? .on : .off
+            item.target = self
+            sortMenu.addItem(item)
+        }
+        sortItem.submenu = sortMenu
+        menu.addItem(sortItem)
+
+        let timeItem = NSMenuItem(title: "时间筛选", action: nil, keyEquivalent: "")
+        let timeMenu = NSMenu()
+        for title in ["全部时间", "今天", "昨天", "最近 7 天", "最近 30 天"] {
+            let item = NSMenuItem(title: title, action: #selector(timeFilterMenuItem(_:)), keyEquivalent: "")
+            item.representedObject = title
+            item.state = timeButton.titleOfSelectedItem == title ? .on : .off
+            item.target = self
+            timeMenu.addItem(item)
+        }
+        timeItem.submenu = timeMenu
+        menu.addItem(timeItem)
+
+        let kindItem = NSMenuItem(title: "文件筛选", action: nil, keyEquivalent: "")
+        let kindMenu = NSMenu()
+        for kind in FileKind.allCases {
+            let item = NSMenuItem(title: kind.rawValue, action: #selector(kindFilterMenuItem(_:)), keyEquivalent: "")
+            item.representedObject = kind.rawValue
+            item.state = typeButton.titleOfSelectedItem == kind.rawValue ? .on : .off
+            item.target = self
+            kindMenu.addItem(item)
+        }
+        kindItem.submenu = kindMenu
+        menu.addItem(kindItem)
+
+        let viewItem = NSMenuItem(title: "视图模式", action: nil, keyEquivalent: "")
+        let viewMenu = NSMenu()
+        for mode in FileViewMode.allCases {
+            let item = NSMenuItem(title: mode.rawValue, action: #selector(viewModeMenuItem(_:)), keyEquivalent: "")
+            item.representedObject = mode.rawValue
+            item.state = settings.viewMode == mode ? .on : .off
+            item.target = self
+            viewMenu.addItem(item)
+        }
+        viewItem.submenu = viewMenu
+        menu.addItem(viewItem)
+
+        let sidebar = NSMenuItem(title: "显示侧栏", action: #selector(toggleSidebarFromMenu), keyEquivalent: "")
+        sidebar.state = settings.showSidebar ? .on : .off
+        sidebar.target = self
+        menu.addItem(sidebar)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let settingsItem = NSMenuItem(title: "设置", action: #selector(openSettings), keyEquivalent: "")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
+        let terminal = NSMenuItem(title: "进入终端", action: #selector(openTerminalHere), keyEquivalent: "")
+        terminal.target = self
+        menu.addItem(terminal)
+
+        return menu
+    }
+
+    @objc private func createFolderInCurrentDirectory() {
+        guard let currentFolderURL else { return }
+        let destination = uniqueDestination(for: "未命名文件夹", in: currentFolderURL)
+        do {
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+            refreshFiles()
+        } catch {
+            showAlert(title: "新建文件夹失败", message: error.localizedDescription)
+        }
+    }
+
+    @objc private func revealCurrentFolderInFinder() {
+        guard let currentFolderURL else { return }
+        NSWorkspace.shared.open(currentFolderURL)
+    }
+
+    @objc private func sortModeMenuItem(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let mode = FileSortMode(rawValue: rawValue) else { return }
+        setSortMode(mode, toggleIfSame: false)
+    }
+
+    private func setSortMode(_ mode: FileSortMode, toggleIfSame: Bool) {
+        if settings.sortMode == mode, toggleIfSame {
+            settings.sortAscending.toggle()
+        } else {
+            settings.sortMode = mode
+            settings.sortAscending = defaultSortAscending(for: mode)
+        }
+        store.saveSettings(settings)
+        updateListColumnTitles()
+        applyFilters()
+    }
+
+    private func defaultSortAscending(for mode: FileSortMode) -> Bool {
+        switch mode {
+        case .name, .kind:
+            return true
+        case .dateModified, .dateCreated, .size:
+            return false
+        }
+    }
+
+    @objc private func viewModeMenuItem(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let mode = FileViewMode(rawValue: rawValue) else { return }
+        settings.viewMode = mode
+        store.saveSettings(settings)
+        updateContentMode()
+        refreshCollection()
+    }
+
+    @objc private func toggleSidebarFromMenu() {
+        toggleSidebarVisibility()
+    }
+
+    private func toggleSidebarVisibility() {
+        settings.showSidebar.toggle()
+        store.saveSettings(settings)
+        updateContentMode()
+    }
+
+    private func updateSidebarButtonState() {
+        sidebarButton.contentTintColor = settings.showSidebar ? .controlAccentColor : nil
+    }
+
+    @objc private func timeFilterMenuItem(_ sender: NSMenuItem) {
+        guard let title = sender.representedObject as? String,
+              let item = timeButton.item(withTitle: title) else { return }
+        timeButton.select(item)
+        applyFilters()
+    }
+
+    @objc private func kindFilterMenuItem(_ sender: NSMenuItem) {
+        guard let title = sender.representedObject as? String,
+              let item = typeButton.item(withTitle: title) else { return }
+        typeButton.select(item)
+        applyFilters()
+    }
+
+    @objc private func openTerminalHere() {
+        guard let currentFolderURL else { return }
+        let terminalURL = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
+        NSWorkspace.shared.open([currentFolderURL], withApplicationAt: terminalURL, configuration: NSWorkspace.OpenConfiguration())
+    }
+
     private func applySettings(_ newSettings: AppSettings) {
+        AppLogger.info("applySettings start")
+        let oldSettings = settings
         settings = newSettings
         store.saveSettings(settings)
         panel.alphaValue = settings.opacity
-        edgePanels.forEach { $0.backgroundColor = settings.showEdgeTrigger ? NSColor.controlAccentColor.withAlphaComponent(0.18) : .clear }
-        applyItemSize()
-        updateContentMode()
-        updatePathLabel()
-        rebuildEdgeTriggers()
-        positionPanel(anchor: settings.sidebarPosition, screen: screenContainingMouse() ?? NSScreen.main)
+
+        var needsVisibleRefresh = false
+        if oldSettings.iconSize != settings.iconSize || oldSettings.iconSpacing != settings.iconSpacing {
+            applyItemSize()
+            needsVisibleRefresh = true
+        }
+        if oldSettings.listInfoColumns != settings.listInfoColumns {
+            configureListColumns()
+            needsVisibleRefresh = true
+        } else {
+            updateListColumnTitles()
+        }
+        if oldSettings.viewMode != settings.viewMode || oldSettings.showSidebar != settings.showSidebar {
+            updateContentMode()
+            needsVisibleRefresh = true
+        } else {
+            updateSidebarButtonState()
+        }
+        if oldSettings.showBottomPath != settings.showBottomPath {
+            updatePathLabel()
+        }
+        if oldSettings.edgeTriggerEnabled != settings.edgeTriggerEnabled ||
+            oldSettings.triggerPositions != settings.triggerPositions {
+            rebuildEdgeTriggers()
+        } else if oldSettings.showEdgeTrigger != settings.showEdgeTrigger {
+            edgePanels.forEach { $0.backgroundColor = settings.showEdgeTrigger ? NSColor.controlAccentColor.withAlphaComponent(0.18) : .clear }
+        }
+        if oldSettings.sidebarPosition != settings.sidebarPosition {
+            positionPanel(anchor: settings.sidebarPosition, screen: screenContainingMouse() ?? NSScreen.main)
+        }
+        if oldSettings.sortMode != settings.sortMode ||
+            oldSettings.sortAscending != settings.sortAscending {
+            applyFilters()
+        } else if needsVisibleRefresh {
+            refreshCollection()
+        }
+        AppLogger.info("applySettings finished")
     }
 
-    private func matchesTimeFilter(_ date: Date?, title: String) -> Bool {
+    private static func matchesTimeFilter(_ date: Date?, title: String) -> Bool {
         guard title != "全部时间" else { return true }
         guard let date else { return false }
 
@@ -1923,6 +2627,7 @@ final class SidebarWindowController: NSObject {
     }
 
     private func showAlert(title: String, message: String) {
+        AppLogger.error("showAlert title=\(title) message=\(message)")
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
@@ -1947,6 +2652,7 @@ extension SidebarWindowController: NSWindowDelegate {
         settings.windowWidth = panel.frame.width
         settings.windowHeight = panel.frame.height
         store.saveSettings(settings)
+        applySidebarWidth()
     }
 }
 
@@ -2004,6 +2710,12 @@ extension SidebarWindowController: NSCollectionViewDataSource, NSCollectionViewD
 
 extension SidebarWindowController: NSOutlineViewDataSource, NSOutlineViewDelegate {
     func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+        if outlineView === sidebarOutlineView {
+            guard let node = item as? FileNode else {
+                return sidebarRootNodes.count
+            }
+            return loadSidebarChildren(for: node).count
+        }
         guard let node = item as? FileNode else {
             return listRootNodes.count
         }
@@ -2011,6 +2723,12 @@ extension SidebarWindowController: NSOutlineViewDataSource, NSOutlineViewDelegat
     }
 
     func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+        if outlineView === sidebarOutlineView {
+            guard let node = item as? FileNode else {
+                return sidebarRootNodes[index]
+            }
+            return loadSidebarChildren(for: node)[index]
+        }
         guard let node = item as? FileNode else {
             return listRootNodes[index]
         }
@@ -2024,6 +2742,23 @@ extension SidebarWindowController: NSOutlineViewDataSource, NSOutlineViewDelegat
 
     func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
         guard let node = item as? FileNode else { return nil }
+        if outlineView === sidebarOutlineView {
+            let view = outlineView.makeView(withIdentifier: SidebarFolderRowView.identifier, owner: self) as? SidebarFolderRowView ?? SidebarFolderRowView()
+            view.identifier = SidebarFolderRowView.identifier
+            view.configure(entry: node.entry)
+            return view
+        }
+
+        guard tableColumn?.identifier.rawValue == "name" else {
+            let view = outlineView.makeView(withIdentifier: FileInfoCellView.identifier, owner: self) as? FileInfoCellView ?? FileInfoCellView()
+            view.identifier = FileInfoCellView.identifier
+            if let rawValue = tableColumn?.identifier.rawValue,
+               let column = ListInfoColumn(rawValue: rawValue) {
+                view.configure(text: listInfoText(for: node.entry, column: column))
+            }
+            return view
+        }
+
         let view = outlineView.makeView(withIdentifier: FileListRowView.identifier, owner: self) as? FileListRowView ?? FileListRowView()
         view.identifier = FileListRowView.identifier
         view.configure(entry: node.entry, depth: outlineView.level(forItem: item))
@@ -2034,23 +2769,47 @@ extension SidebarWindowController: NSOutlineViewDataSource, NSOutlineViewDelegat
     }
 
     func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
+        guard outlineView !== sidebarOutlineView else { return nil }
         guard let node = item as? FileNode else { return nil }
         return node.entry.url as NSURL
     }
 
+    func outlineView(_ outlineView: NSOutlineView, didClick tableColumn: NSTableColumn) {
+        guard outlineView === self.outlineView else { return }
+        guard let mode = sortMode(for: tableColumn) else { return }
+        setSortMode(mode, toggleIfSame: true)
+    }
+
+    private func sortMode(for tableColumn: NSTableColumn) -> FileSortMode? {
+        let identifier = tableColumn.identifier.rawValue
+        if identifier == "name" { return .name }
+        guard let column = ListInfoColumn(rawValue: identifier) else { return nil }
+        return sortMode(for: column)
+    }
+
     func outlineViewSelectionDidChange(_ notification: Notification) {
+        if notification.object as AnyObject? === sidebarOutlineView {
+            let row = sidebarOutlineView.selectedRow
+            guard row >= 0, let node = sidebarOutlineView.item(atRow: row) as? FileNode else { return }
+            enterFolderFromSidebar(node.entry.url)
+            return
+        }
+
+        guard notification.object as AnyObject? === outlineView else { return }
         previewButton.isEnabled = selectedPreviewURL() != nil
         updateLevelDots()
         updatePreviewPanelForSelectionChange()
     }
 
     func outlineViewItemDidExpand(_ notification: Notification) {
+        guard notification.object as AnyObject? === outlineView else { return }
         guard let node = notification.userInfo?["NSObject"] as? FileNode else { return }
         setListNode(node, expanded: true)
         updateLevelDots()
     }
 
     func outlineViewItemDidCollapse(_ notification: Notification) {
+        guard notification.object as AnyObject? === outlineView else { return }
         guard let node = notification.userInfo?["NSObject"] as? FileNode else { return }
         setListNode(node, expanded: false)
         updateLevelDots()
@@ -2064,6 +2823,51 @@ extension SidebarWindowController: NSOutlineViewDataSource, NSOutlineViewDelegat
         } else {
             NSWorkspace.shared.open(node.entry.url)
         }
+    }
+
+    @objc private func sidebarDoubleClicked() {
+        let row = sidebarOutlineView.clickedRow >= 0 ? sidebarOutlineView.clickedRow : sidebarOutlineView.selectedRow
+        guard row >= 0, let node = sidebarOutlineView.item(atRow: row) as? FileNode else { return }
+        enterFolderFromSidebar(node.entry.url)
+    }
+
+    private func enterFolderFromSidebar(_ url: URL) {
+        guard let selectedRootURL else { return }
+        currentFolderURL = url
+        navigationStack = parentPathURLs(from: selectedRootURL, to: url)
+        saveCurrentFolderState()
+        reloadFiles(from: url)
+    }
+
+    private func parentPathURLs(from root: URL, to target: URL) -> [URL] {
+        guard target.path.hasPrefix(root.path), target != root else { return [] }
+        var urls: [URL] = []
+        var current = target.deletingLastPathComponent()
+        while current.path.hasPrefix(root.path), current != root {
+            urls.insert(current, at: 0)
+            current.deleteLastPathComponent()
+        }
+        urls.insert(root, at: 0)
+        return urls
+    }
+
+    private func listInfoText(for entry: FileEntry, column: ListInfoColumn) -> String {
+        switch column {
+        case .kind:
+            return entry.isDirectory ? "文件夹" : entry.kind.rawValue
+        case .dateModified:
+            return formattedDate(entry.modifiedAt)
+        case .dateCreated:
+            return formattedDate(entry.createdAt)
+        case .size:
+            guard !entry.isDirectory, let fileSize = entry.fileSize else { return "--" }
+            return ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file)
+        }
+    }
+
+    private func formattedDate(_ date: Date?) -> String {
+        guard let date else { return "--" }
+        return DateFormatter.localizedString(from: date, dateStyle: .short, timeStyle: .short)
     }
 }
 
