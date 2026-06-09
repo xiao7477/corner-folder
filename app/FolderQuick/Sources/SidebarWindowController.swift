@@ -623,31 +623,47 @@ final class SidebarWindowController: NSObject {
     }
 
     private func configureListColumns() {
-        while let column = outlineView.tableColumns.first {
-            outlineView.removeTableColumn(column)
-        }
+        AppLogger.info("configureListColumns start visibleColumns=\(settings.listInfoColumns.map(\.rawValue).joined(separator: ","))")
 
-        let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+        let nameIdentifier = NSUserInterfaceItemIdentifier("name")
+        let nameColumn = outlineView.tableColumns.first(where: { $0.identifier == nameIdentifier }) ?? NSTableColumn(identifier: nameIdentifier)
+        if !outlineView.tableColumns.contains(nameColumn) {
+            outlineView.addTableColumn(nameColumn)
+        }
         nameColumn.title = sortTitle("名称", mode: .name)
         nameColumn.minWidth = 220
-        nameColumn.width = 320
+        nameColumn.width = max(nameColumn.width, 320)
         nameColumn.resizingMask = .userResizingMask
-        outlineView.addTableColumn(nameColumn)
+        nameColumn.isHidden = false
         outlineView.outlineTableColumn = nameColumn
 
-        for infoColumn in settings.listInfoColumns {
-            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(infoColumn.rawValue))
+        for infoColumn in ListInfoColumn.allCases {
+            let identifier = NSUserInterfaceItemIdentifier(infoColumn.rawValue)
+            let column = outlineView.tableColumns.first(where: { $0.identifier == identifier }) ?? NSTableColumn(identifier: identifier)
+            if !outlineView.tableColumns.contains(column) {
+                outlineView.addTableColumn(column)
+            }
             column.title = sortTitle(infoColumn.rawValue, mode: sortMode(for: infoColumn))
             column.minWidth = infoColumn == .size ? 78 : 110
-            column.width = infoColumn == .size ? 92 : 142
+            column.width = max(column.width, infoColumn == .size ? 92 : 142)
             column.resizingMask = .userResizingMask
-            outlineView.addTableColumn(column)
+            column.isHidden = !settings.listInfoColumns.contains(infoColumn)
         }
-        let headerView = FolderQuickTableHeaderView()
-        headerView.menuProvider = { [weak self] in
-            self?.emptyAreaMenu()
+
+        if let headerView = outlineView.headerView as? FolderQuickTableHeaderView {
+            headerView.menuProvider = { [weak self] in
+                self?.emptyAreaMenu()
+            }
+        } else {
+            let headerView = FolderQuickTableHeaderView()
+            headerView.menuProvider = { [weak self] in
+                self?.emptyAreaMenu()
+            }
+            outlineView.headerView = headerView
         }
-        outlineView.headerView = headerView
+
+        outlineView.noteNumberOfRowsChanged()
+        AppLogger.info("configureListColumns finished columns=\(outlineView.tableColumns.map { "\($0.identifier.rawValue):\($0.isHidden ? "hidden" : "visible")" }.joined(separator: ","))")
     }
 
     private func updateListColumnTitles() {
