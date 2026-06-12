@@ -49,12 +49,17 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-"$PYTHON" "$ROOT_DIR/Tools/create_icon.py" "$BUILD_DIR/FolderQuick.iconset"
-cp "$BUILD_DIR/FolderQuick.iconset/icon_512x512@2x.png" "$RESOURCES_DIR/FolderQuick.png"
-if iconutil -c icns "$BUILD_DIR/FolderQuick.iconset" -o "$RESOURCES_DIR/FolderQuick.icns" 2>/dev/null; then
-  true
+if [ -f "$ROOT_DIR/Resources/FolderQuick.icns" ]; then
+  cp "$ROOT_DIR/Resources/FolderQuick.icns" "$RESOURCES_DIR/FolderQuick.icns"
+  cp "$ROOT_DIR/Resources/FolderQuick.iconset/icon_512x512@2x.png" "$RESOURCES_DIR/FolderQuick.png"
 else
-  echo "warning: iconutil could not create FolderQuick.icns; kept FolderQuick.png as the icon source."
+  "$PYTHON" "$ROOT_DIR/Tools/create_icon.py" "$BUILD_DIR/FolderQuick.iconset"
+  cp "$BUILD_DIR/FolderQuick.iconset/icon_512x512@2x.png" "$RESOURCES_DIR/FolderQuick.png"
+  if iconutil -c icns "$BUILD_DIR/FolderQuick.iconset" -o "$RESOURCES_DIR/FolderQuick.icns" 2>/dev/null; then
+    true
+  else
+    echo "warning: iconutil could not create FolderQuick.icns; kept FolderQuick.png as the icon source."
+  fi
 fi
 
 printf "APPL????" > "$CONTENTS_DIR/PkgInfo"

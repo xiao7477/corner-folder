@@ -24,6 +24,7 @@
 		20A100000000000000000020 /* FilePasteboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000020 /* FilePasteboardReader.swift */; };
 		20A100000000000000000021 /* FileDropScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000021 /* FileDropScrollView.swift */; };
 		20A100000000000000000022 /* FileTransferProgressPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000022 /* FileTransferProgressPanel.swift */; };
+		20A100000000000000000023 /* FolderQuick.icns in Resources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000023 /* FolderQuick.icns */; };
 		20A100000000000000000010 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000010 /* AppKit.framework */; };
 		20A100000000000000000011 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000011 /* Quartz.framework */; };
 		20A100000000000000000012 /* QuickLookThumbnailing.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000012 /* QuickLookThumbnailing.framework */; };
@@ -52,6 +53,7 @@
 		20A000000000000000000020 /* FilePasteboardReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePasteboardReader.swift; sourceTree = "<group>"; };
 		20A000000000000000000021 /* FileDropScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDropScrollView.swift; sourceTree = "<group>"; };
 		20A000000000000000000022 /* FileTransferProgressPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTransferProgressPanel.swift; sourceTree = "<group>"; };
+		20A000000000000000000023 /* FolderQuick.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = FolderQuick.icns; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				20A300000000000000000002 /* Sources */,
+				20A300000000000000000005 /* Resources */,
 				20A300000000000000000003 /* Frameworks */,
 				20A300000000000000000004 /* Products */,
 				20A000000000000000000014 /* AppInfo.plist */,
@@ -118,6 +121,14 @@
 				20A000000000000000000013 /* FolderQuick.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		20A300000000000000000005 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				20A000000000000000000023 /* FolderQuick.icns */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -178,6 +189,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				20A100000000000000000023 /* FolderQuick.icns in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
