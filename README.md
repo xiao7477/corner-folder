@@ -39,14 +39,14 @@ Folder_Quick/
 推荐使用 Xcode 构建脚本：
 
 ```bash
-cd /Users/xiao-mbp2023/CodeSpace/Folder_Quick/app/FolderQuick
+cd app/FolderQuick
 ./build_xcode.sh
 ```
 
 构建完成后应用在：
 
 ```text
-/Users/xiao-mbp2023/CodeSpace/Folder_Quick/app/FolderQuick/build/XcodeDerived/Build/Products/Debug/FolderQuick.app
+app/FolderQuick/build/XcodeDerived/Build/Products/Debug/FolderQuick.app
 ```
 
 ## 文档入口
@@ -55,9 +55,12 @@ cd /Users/xiao-mbp2023/CodeSpace/Folder_Quick/app/FolderQuick
 - 构建和开发说明：[docs/开发说明.md](./docs/开发说明.md)
 - 更新记录：[releases/changelog.md](./releases/changelog.md)
 
+## 开源协议
+
+本项目使用 MIT License，详见 [LICENSE](./LICENSE)。
+
 ## 近期待完善
 
 - 自定义全局快捷键。
-- 正式 `.icns` 应用图标。
 - 更完整的签名、打包和分发流程。
 - 更接近访达的列宽记忆、排序细节和大文件拷贝体验。

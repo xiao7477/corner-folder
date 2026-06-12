@@ -7,7 +7,7 @@ APP_DIR="$BUILD_DIR/FolderQuick.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
-PYTHON="/Users/xiao-mbp2023/CodeSpace/MyTools/venv/bin/python3"
+PYTHON="${PYTHON:-python3}"
 
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$ROOT_DIR/.clang-module-cache"
 
