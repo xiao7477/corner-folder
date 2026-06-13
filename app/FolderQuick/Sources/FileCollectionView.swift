@@ -163,9 +163,8 @@ final class FileCollectionView: NSCollectionView {
     }
 
     private func dropIndexPath(for sender: NSDraggingInfo) -> IndexPath? {
-        let convertedPoint = convert(sender.draggingLocation, from: nil)
-        return dropFriendlyIndexPath(at: sender.draggingLocation)
-            ?? dropFriendlyIndexPath(at: convertedPoint)
+        let pointInCollectionView = convert(sender.draggingLocation, from: nil)
+        return dropFriendlyIndexPath(at: pointInCollectionView)
     }
 
     private func dropFriendlyIndexPath(at point: NSPoint) -> IndexPath? {
