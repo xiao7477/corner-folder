@@ -168,6 +168,10 @@ final class FileCollectionView: NSCollectionView {
     }
 
     private func dropFriendlyIndexPath(at point: NSPoint) -> IndexPath? {
+        if let visibleIndexPath = visibleItemIndexPath(at: point, padding: 8, dropTargetsOnly: true) {
+            return visibleIndexPath
+        }
+
         guard let layoutAttributes = collectionViewLayout?.layoutAttributesForElements(in: visibleRect) else {
             return nil
         }
@@ -193,7 +197,7 @@ final class FileCollectionView: NSCollectionView {
     }
 
     private func finderLikeIndexPath(at point: NSPoint) -> IndexPath? {
-        if let indexPath = indexPathForItem(at: point) {
+        if let indexPath = visibleItemIndexPath(at: point, padding: 4, dropTargetsOnly: false) {
             return indexPath
         }
 
@@ -202,10 +206,53 @@ final class FileCollectionView: NSCollectionView {
         }
 
         return layoutAttributes
-            .filter { $0.representedElementCategory == .item && $0.frame.contains(point) }
+            .filter { attributes in
+                guard attributes.representedElementCategory == .item,
+                      let indexPath = attributes.indexPath else {
+                    return false
+                }
+                return isPointNearItemContent(point, attributes: attributes, indexPath: indexPath)
+            }
             .sorted { $0.frame.minY == $1.frame.minY ? $0.frame.minX < $1.frame.minX : $0.frame.minY > $1.frame.minY }
             .first?
             .indexPath
+    }
+
+    private func visibleItemIndexPath(at point: NSPoint, padding: CGFloat, dropTargetsOnly: Bool) -> IndexPath? {
+        visibleItems()
+            .compactMap { item -> (IndexPath, CGFloat)? in
+                guard let fileItem = item as? FileItemView,
+                      let indexPath = indexPath(for: item) else {
+                    return nil
+                }
+                if dropTargetsOnly, isDropTargetProvider?(indexPath) == false {
+                    return nil
+                }
+                guard fileItem.containsSelectablePoint(point, in: self, padding: padding),
+                      let attributes = layoutAttributesForItem(at: indexPath) else {
+                    return nil
+                }
+                let distance = hypot(point.x - attributes.frame.midX, point.y - attributes.frame.midY)
+                return (indexPath, distance)
+            }
+            .sorted { $0.1 < $1.1 }
+            .first?
+            .0
+    }
+
+    private func isPointNearItemContent(_ point: NSPoint, attributes: NSCollectionViewLayoutAttributes, indexPath: IndexPath) -> Bool {
+        if let fileItem = item(at: indexPath) as? FileItemView {
+            return fileItem.containsSelectablePoint(point, in: self, padding: 4)
+        }
+
+        let iconHeight = attributes.frame.height * 0.72
+        let contentFrame = NSRect(
+            x: attributes.frame.minX,
+            y: attributes.frame.maxY - iconHeight,
+            width: attributes.frame.width,
+            height: iconHeight
+        ).insetBy(dx: 0, dy: -4)
+        return contentFrame.contains(point)
     }
 
     private func updateSelection(for indexPath: IndexPath, event: NSEvent) {

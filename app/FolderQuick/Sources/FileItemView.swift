@@ -129,6 +129,12 @@ final class FileItemView: NSCollectionViewItem, NSTextFieldDelegate {
         renameField.currentEditor()?.selectAll(nil)
     }
 
+    func containsSelectablePoint(_ point: NSPoint, in coordinateView: NSView, padding: CGFloat = 0) -> Bool {
+        view.layoutSubtreeIfNeeded()
+        let localPoint = view.convert(point, from: coordinateView)
+        return selectionView.frame.insetBy(dx: -padding, dy: -padding).contains(localPoint)
+    }
+
     @objc private func commitRename() {
         finishRenaming(shouldCommit: true)
     }
