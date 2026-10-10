@@ -1,6 +1,6 @@
-# FolderQuick
+# 边边文件夹（FolderQuick）
 
-FolderQuick 是一款 macOS 菜单栏侧边文件工作台。它不替代访达，而是把常用文件夹放到一个随叫随到的窗口里，让找文件、预览文件、拖拽文件更快完成。
+边边文件夹是一款 macOS 菜单栏侧边文件工作台。它不替代访达，而是把常用文件夹放到一个随叫随到的窗口里，让找文件、预览文件、拖拽文件更快完成。
 
 ## 界面预览
 
@@ -17,12 +17,13 @@ FolderQuick 是一款 macOS 菜单栏侧边文件工作台。它不替代访达�
 - 文件右键菜单：在访达中显示、打开方式、重命名、复制路径、获取信息、删除到废纸篓、快速操作、置顶文件。
 - 空白处右键菜单：新建文件夹、在访达中显示、排序、视图模式、侧栏开关、设置、进入终端。
 - 支持外部文件拖入当前目录或指定文件夹，拖拽悬停 1 秒可自动进入下一级。
-- 支持从 FolderQuick 拖出文件到微信、邮件、浏览器、设计软件等其他 App。
+- 支持从边边文件夹拖出文件到微信、邮件、浏览器、设计软件等其他 App。
 - 空格键使用系统 Quick Look 预览，预览打开时切换文件会同步更新。
 - 复制、粘贴、删除、重命名、预览等快捷键尽量贴近访达习惯。
 - 菜单栏图标左键显示/隐藏，右键打开菜单。
 - 支持屏幕边缘触发、窗口置顶、透明度、图标大小、图标间距、底部路径显示等设置。
 - 设置改为手动保存，并带本地日志，方便定位卡死或异常。
+- 从菜单栏右键菜单或设置窗口检查 GitHub 新版本，直接下载、安装并重新打开应用。
 
 ## 项目目录
 
@@ -51,14 +52,31 @@ cd app/FolderQuick
 构建完成后应用在：
 
 ```text
-app/FolderQuick/build/XcodeDerived/Build/Products/Release/FolderQuick.app
+app/FolderQuick/build/XcodeDerived/Build/Products/Release/边边文件夹.app
 ```
+
+## 发布元数据
+
+发布时优先改这两份文件，保持内容一致：
+
+- `app/FolderQuick/ReleaseMetadata.xcconfig`：给 Xcode、`AppInfo.plist` 使用。
+- `app/FolderQuick/release_metadata.sh`：给 shell 构建和 DMG 打包脚本使用。
+
+当前约定：
+
+- 公开应用名：`边边文件夹`
+- 内部可执行文件名：`FolderQuick`
+- bundle id：`com.bianbian.folderquick`
+- 版本号：`1.0.1`
+- build 号：`101`
+- DMG 名：`BianbianFolder-1.0.1-universal.dmg`
 
 ## 文档入口
 
 - 当前版本用法：[docs/使用说明.md](./docs/使用说明.md)
 - 构建和开发说明：[docs/开发说明.md](./docs/开发说明.md)
 - 更新记录：[releases/changelog.md](./releases/changelog.md)
+- 自动更新与发布：[docs/自动更新发布.md](./docs/自动更新发布.md)
 
 ## 开源协议
 

@@ -1,4 +1,6 @@
 .DS_Store
+.update-signing/
+dist/updates/
 
 # Swift build output
 .build/
