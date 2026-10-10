@@ -22,11 +22,12 @@ final class SettingsPanel: NSPanel {
     private let iconSizeValue = NSTextField(labelWithString: "")
     private let iconSpacingValue = NSTextField(labelWithString: "")
     private let autoHideValue = NSTextField(labelWithString: "")
+    private var updateObservation: NSKeyValueObservation?
 
     init(settings: AppSettings) {
         self.settings = settings
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 680),
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 730),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -113,6 +114,7 @@ final class SettingsPanel: NSPanel {
         hint.font = .systemFont(ofSize: 12)
         hint.textColor = .secondaryLabelColor
         stack.addArrangedSubview(hint)
+        stack.addArrangedSubview(updateControls())
         stack.addArrangedSubview(actionButtons())
 
         let wrapper = NSView()
@@ -125,6 +127,30 @@ final class SettingsPanel: NSPanel {
             stack.bottomAnchor.constraint(lessThanOrEqualTo: wrapper.bottomAnchor)
         ])
         contentView = wrapper
+    }
+
+    private func updateControls() -> NSView {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        let label = NSTextField(labelWithString: "当前版本 \(version)")
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .secondaryLabelColor
+
+        let button = NSButton(
+            title: "检查更新…",
+            target: AppUpdater.shared,
+            action: #selector(AppUpdater.checkForUpdates(_:))
+        )
+        button.bezelStyle = .rounded
+        updateObservation = AppUpdater.shared.updater.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak button] updater, _ in
+            DispatchQueue.main.async {
+                button?.isEnabled = updater.canCheckForUpdates
+            }
+        }
+        let row = NSStackView(views: [label, button])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+        return row
     }
 
     private func row(label: String, control: NSView, valueLabel: NSTextField?) -> NSView {

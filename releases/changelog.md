@@ -1,8 +1,17 @@
 # 更新记录
 
+## 1.0.1
+
+- 接入 Sparkle 应用内更新，支持从菜单栏右键菜单或设置窗口检查新版、下载、安装和重新打开应用。
+- 默认在后台定期检查新版本，安装前由用户确认。
+- 更新包和更新信息均通过 Ed25519 签名验证。
+- 增加更新包生成脚本和 GitHub 发布说明。
+- 修复列表模式拖入展开子文件夹后没有自动刷新内容的问题。
+
 ## 1.0.0
 
 - 标记为第一个可发行版本。
+- 统一发布元数据来源：公开应用名、bundle id、版本号、build 号和 DMG 文件名都集中维护。
 - 确认当前核心功能进入可日常使用状态：标签页、图标视图、列表视图、侧栏、拖拽、Quick Look、右键菜单、设置和边缘触发。
 - 接入正式应用图标：玻璃质感圆角矩形图标，四角为真实透明通道，并已合成为 macOS `.icns`。
 - 整理项目目录和说明文档，删除过期规划与旧 MVP 文档。
@@ -65,7 +74,7 @@
 
 - 新增标准 Xcode 工程 `FolderQuick.xcodeproj`。
 - 新增 Xcode 构建脚本 `build_xcode.sh`。
-- Xcode Debug 构建会输出标准 `.app` 到 `build/XcodeDerived/Build/Products/Debug/FolderQuick.app`。
+- Xcode Debug 构建会输出标准 `.app` 到 `build/XcodeDerived/Build/Products/Debug/`。
 - 保留原来的命令行 Swift 构建脚本，方便快速验证。
 
 ## 0.2.0

@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		20A100000000000000000025 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000025 /* AppUpdater.swift */; };
+		20A100000000000000000026 /* Sparkle.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000026 /* Sparkle.framework */; };
+		20A100000000000000000027 /* Sparkle.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000026 /* Sparkle.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		20A100000000000000000001 /* EdgeTriggerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000001 /* EdgeTriggerView.swift */; };
 		20A100000000000000000002 /* FileItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000002 /* FileItemView.swift */; };
 		20A100000000000000000003 /* FileLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000003 /* FileLoader.swift */; };
@@ -31,6 +34,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		20A000000000000000000025 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
+		20A000000000000000000026 /* Sparkle.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = build/Sparkle/2.10.0/Sparkle.framework; sourceTree = SOURCE_ROOT; };
 		20A000000000000000000001 /* EdgeTriggerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeTriggerView.swift; sourceTree = "<group>"; };
 		20A000000000000000000002 /* FileItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemView.swift; sourceTree = "<group>"; };
 		20A000000000000000000003 /* FileLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileLoader.swift; sourceTree = "<group>"; };
@@ -43,7 +48,7 @@
 		20A000000000000000000010 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		20A000000000000000000011 /* Quartz.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Quartz.framework; path = System/Library/Frameworks/Quartz.framework; sourceTree = SDKROOT; };
 		20A000000000000000000012 /* QuickLookThumbnailing.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLookThumbnailing.framework; path = System/Library/Frameworks/QuickLookThumbnailing.framework; sourceTree = SDKROOT; };
-		20A000000000000000000013 /* FolderQuick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FolderQuick.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		20A000000000000000000013 /* 边边文件夹.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "边边文件夹.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		20A000000000000000000014 /* AppInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = AppInfo.plist; sourceTree = "<group>"; };
 		20A000000000000000000015 /* FolderTabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderTabButton.swift; sourceTree = "<group>"; };
 		20A000000000000000000016 /* FileListRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileListRowView.swift; sourceTree = "<group>"; };
@@ -54,6 +59,7 @@
 		20A000000000000000000021 /* FileDropScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDropScrollView.swift; sourceTree = "<group>"; };
 		20A000000000000000000022 /* FileTransferProgressPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTransferProgressPanel.swift; sourceTree = "<group>"; };
 		20A000000000000000000023 /* FolderQuick.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = FolderQuick.icns; sourceTree = "<group>"; };
+		20A000000000000000000024 /* ReleaseMetadata.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ReleaseMetadata.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,6 +67,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				20A100000000000000000026 /* Sparkle.framework in Frameworks */,
 				20A100000000000000000010 /* AppKit.framework in Frameworks */,
 				20A100000000000000000011 /* Quartz.framework in Frameworks */,
 				20A100000000000000000012 /* QuickLookThumbnailing.framework in Frameworks */,
@@ -68,6 +75,18 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		20A200000000000000000002 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (20A100000000000000000027 /* Sparkle.framework in Embed Frameworks */, );
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXGroup section */
 		20A300000000000000000001 = {
@@ -78,12 +97,14 @@
 				20A300000000000000000003 /* Frameworks */,
 				20A300000000000000000004 /* Products */,
 				20A000000000000000000014 /* AppInfo.plist */,
+				20A000000000000000000024 /* ReleaseMetadata.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
 		20A300000000000000000002 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				20A000000000000000000025 /* AppUpdater.swift */,
 				20A000000000000000000001 /* EdgeTriggerView.swift */,
 				20A000000000000000000002 /* FileItemView.swift */,
 				20A000000000000000000019 /* FileCollectionView.swift */,
@@ -108,6 +129,7 @@
 		20A300000000000000000003 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				20A000000000000000000026 /* Sparkle.framework */,
 				20A000000000000000000010 /* AppKit.framework */,
 				20A000000000000000000011 /* Quartz.framework */,
 				20A000000000000000000012 /* QuickLookThumbnailing.framework */,
@@ -118,7 +140,7 @@
 		20A300000000000000000004 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				20A000000000000000000013 /* FolderQuick.app */,
+				20A000000000000000000013 /* 边边文件夹.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -140,6 +162,7 @@
 			buildPhases = (
 				20A500000000000000000001 /* Sources */,
 				20A200000000000000000001 /* Frameworks */,
+				20A200000000000000000002 /* Embed Frameworks */,
 				20A600000000000000000001 /* Resources */,
 			);
 			buildRules = (
@@ -148,7 +171,7 @@
 			);
 			name = FolderQuick;
 			productName = FolderQuick;
-			productReference = 20A000000000000000000013 /* FolderQuick.app */;
+			productReference = 20A000000000000000000013 /* 边边文件夹.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -200,6 +223,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				20A100000000000000000025 /* AppUpdater.swift in Sources */,
 				20A100000000000000000001 /* EdgeTriggerView.swift in Sources */,
 				20A100000000000000000002 /* FileItemView.swift in Sources */,
 				20A100000000000000000003 /* FileLoader.swift in Sources */,
@@ -279,6 +303,7 @@
 		};
 		20A800000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 20A000000000000000000024 /* ReleaseMetadata.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
@@ -289,15 +314,13 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				PRODUCT_BUNDLE_IDENTIFIER = local.folderquick.mvp;
-				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
 		20A800000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 20A000000000000000000024 /* ReleaseMetadata.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
@@ -308,9 +331,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				PRODUCT_BUNDLE_IDENTIFIER = local.folderquick.mvp;
-				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

@@ -18,6 +18,7 @@ final class FolderQuickApp: NSObject, NSApplicationDelegate {
             }
         }
         hotkey?.register()
+        AppUpdater.shared.start()
         setupStatusItem()
         installStatusDragMonitor()
         controller?.showWindow()
@@ -33,6 +34,8 @@ final class FolderQuickApp: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "显示/隐藏 FolderQuick", action: #selector(toggleWindow), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(AppUpdater.shared.makeMenuItem())
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
         statusMenu = menu

@@ -2,23 +2,33 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$ROOT_DIR/release_metadata.sh"
+SPARKLE_DIR="$("$ROOT_DIR/prepare_sparkle.sh")"
+UPDATE_FEED_URL="$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$ROOT_DIR/AppInfo.plist")"
+UPDATE_PUBLIC_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$ROOT_DIR/AppInfo.plist")"
+
 BUILD_DIR="$ROOT_DIR/build"
-APP_DIR="$BUILD_DIR/FolderQuick.app"
+APP_DIR="$BUILD_DIR/$APP_DISPLAY_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
-PYTHON="${PYTHON:-python3}"
+PYTHON="${PYTHON:-/Users/xiao-mbp2023/CodeSpace/MyTools/venv/bin/python3}"
 
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$ROOT_DIR/.clang-module-cache"
 
 CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.clang-module-cache" \
 swiftc "$ROOT_DIR"/Sources/*.swift \
-  -o "$MACOS_DIR/FolderQuick" \
+  -o "$MACOS_DIR/$APP_EXECUTABLE_NAME" \
   -framework AppKit \
   -framework Quartz \
-  -framework QuickLookThumbnailing
+  -framework QuickLookThumbnailing \
+  -F "$SPARKLE_DIR" -framework Sparkle \
+  -Xlinker -rpath -Xlinker '@executable_path/../Frameworks'
 
-cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
+mkdir -p "$CONTENTS_DIR/Frameworks"
+ditto "$SPARKLE_DIR/Sparkle.framework" "$CONTENTS_DIR/Frameworks/Sparkle.framework"
+
+cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -26,24 +36,38 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundleDevelopmentRegion</key>
   <string>zh_CN</string>
   <key>CFBundleExecutable</key>
-  <string>FolderQuick</string>
+  <string>$APP_EXECUTABLE_NAME</string>
   <key>CFBundleIdentifier</key>
-  <string>local.folderquick.mvp</string>
+  <string>$APP_BUNDLE_IDENTIFIER</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
+  <key>CFBundleDisplayName</key>
+  <string>$APP_DISPLAY_NAME</string>
   <key>CFBundleName</key>
-  <string>FolderQuick</string>
+  <string>$APP_DISPLAY_NAME</string>
   <key>CFBundleIconFile</key>
   <string>FolderQuick</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>$APP_MARKETING_VERSION</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>$APP_BUILD_VERSION</string>
   <key>LSMinimumSystemVersion</key>
-  <string>13.0</string>
+  <string>$APP_MIN_MACOS_VERSION</string>
   <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>SUFeedURL</key>
+  <string>$UPDATE_FEED_URL</string>
+  <key>SUPublicEDKey</key>
+  <string>$UPDATE_PUBLIC_KEY</string>
+  <key>SUEnableAutomaticChecks</key>
+  <true/>
+  <key>SUAutomaticallyUpdate</key>
+  <false/>
+  <key>SUVerifyUpdateBeforeExtraction</key>
+  <true/>
+  <key>SURequireSignedFeed</key>
   <true/>
 </dict>
 </plist>

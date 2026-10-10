@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+APP_DISPLAY_NAME="边边文件夹"
+APP_BUNDLE_BASENAME="BianbianFolder"
+APP_EXECUTABLE_NAME="FolderQuick"
+APP_BUNDLE_IDENTIFIER="com.bianbian.folderquick"
+APP_MARKETING_VERSION="1.0.1"
+APP_BUILD_VERSION="101"
+APP_MIN_MACOS_VERSION="13.0"
