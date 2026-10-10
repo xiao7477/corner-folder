@@ -2055,11 +2055,11 @@ final class SidebarWindowController: NSObject {
         }
 
         guard !tasks.isEmpty else { return false }
-        startImportTasks(tasks, targetFolderURL: folderURL, operation: operation)
+        startImportTasks(tasks, operation: operation)
         return true
     }
 
-    private func startImportTasks(_ tasks: [FileImportTask], targetFolderURL: URL, operation: FileImportOperation) {
+    private func startImportTasks(_ tasks: [FileImportTask], operation: FileImportOperation) {
         let title = operation == .move ? "正在移动" : "正在复制"
         transferProgressPanel.show(
             on: panel.screen ?? screenContainingMouse(),
@@ -2111,17 +2111,14 @@ final class SidebarWindowController: NSObject {
 
                 DispatchQueue.main.async {
                     self.transferProgressPanel.finish(title: "完成", detail: "\(tasks.count) 个项目已处理")
-                    if targetFolderURL == self.currentFolderURL || operation == .move {
-                        self.refreshFiles()
-                    }
+                    // A drop can change a cached, expanded subfolder in the list.
+                    self.refreshFiles()
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.transferProgressPanel.finish(title: operation == .move ? "移动失败" : "复制失败", detail: error.localizedDescription)
                     self.showAlert(title: operation == .move ? "移动失败" : "复制失败", message: error.localizedDescription)
-                    if targetFolderURL == self.currentFolderURL || operation == .move {
-                        self.refreshFiles()
-                    }
+                    self.refreshFiles()
                 }
             }
         }
