@@ -10,6 +10,7 @@
 		20A100000000000000000025 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000025 /* AppUpdater.swift */; };
 		20A100000000000000000026 /* Sparkle.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000026 /* Sparkle.framework */; };
 		20A100000000000000000027 /* Sparkle.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000026 /* Sparkle.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		20A100000000000000000029 /* FinderFileTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000028 /* FinderFileTransfer.swift */; };
 		20A100000000000000000001 /* EdgeTriggerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000001 /* EdgeTriggerView.swift */; };
 		20A100000000000000000002 /* FileItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000002 /* FileItemView.swift */; };
 		20A100000000000000000003 /* FileLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000003 /* FileLoader.swift */; };
@@ -26,7 +27,6 @@
 		20A100000000000000000019 /* FileCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000019 /* FileCollectionView.swift */; };
 		20A100000000000000000020 /* FilePasteboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000020 /* FilePasteboardReader.swift */; };
 		20A100000000000000000021 /* FileDropScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000021 /* FileDropScrollView.swift */; };
-		20A100000000000000000022 /* FileTransferProgressPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000022 /* FileTransferProgressPanel.swift */; };
 		20A100000000000000000023 /* FolderQuick.icns in Resources */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000023 /* FolderQuick.icns */; };
 		20A100000000000000000010 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000010 /* AppKit.framework */; };
 		20A100000000000000000011 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20A000000000000000000011 /* Quartz.framework */; };
@@ -36,6 +36,7 @@
 /* Begin PBXFileReference section */
 		20A000000000000000000025 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		20A000000000000000000026 /* Sparkle.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = build/Sparkle/2.10.0/Sparkle.framework; sourceTree = SOURCE_ROOT; };
+		20A000000000000000000028 /* FinderFileTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderFileTransfer.swift; sourceTree = "<group>"; };
 		20A000000000000000000001 /* EdgeTriggerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeTriggerView.swift; sourceTree = "<group>"; };
 		20A000000000000000000002 /* FileItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileItemView.swift; sourceTree = "<group>"; };
 		20A000000000000000000003 /* FileLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileLoader.swift; sourceTree = "<group>"; };
@@ -57,7 +58,6 @@
 		20A000000000000000000019 /* FileCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileCollectionView.swift; sourceTree = "<group>"; };
 		20A000000000000000000020 /* FilePasteboardReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePasteboardReader.swift; sourceTree = "<group>"; };
 		20A000000000000000000021 /* FileDropScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDropScrollView.swift; sourceTree = "<group>"; };
-		20A000000000000000000022 /* FileTransferProgressPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTransferProgressPanel.swift; sourceTree = "<group>"; };
 		20A000000000000000000023 /* FolderQuick.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = FolderQuick.icns; sourceTree = "<group>"; };
 		20A000000000000000000024 /* ReleaseMetadata.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ReleaseMetadata.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -109,7 +109,7 @@
 				20A000000000000000000002 /* FileItemView.swift */,
 				20A000000000000000000019 /* FileCollectionView.swift */,
 				20A000000000000000000021 /* FileDropScrollView.swift */,
-				20A000000000000000000022 /* FileTransferProgressPanel.swift */,
+				20A000000000000000000028 /* FinderFileTransfer.swift */,
 				20A000000000000000000003 /* FileLoader.swift */,
 				20A000000000000000000020 /* FilePasteboardReader.swift */,
 				20A000000000000000000004 /* FolderStore.swift */,
@@ -239,7 +239,7 @@
 				20A100000000000000000019 /* FileCollectionView.swift in Sources */,
 				20A100000000000000000020 /* FilePasteboardReader.swift in Sources */,
 				20A100000000000000000021 /* FileDropScrollView.swift in Sources */,
-				20A100000000000000000022 /* FileTransferProgressPanel.swift in Sources */,
+				20A100000000000000000029 /* FinderFileTransfer.swift in Sources */,
 				20A100000000000000000009 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

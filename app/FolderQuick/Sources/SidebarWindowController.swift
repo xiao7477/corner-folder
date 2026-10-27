@@ -98,7 +98,6 @@ final class SidebarWindowController: NSObject {
     private var sidebarScrollView = NSScrollView()
     private var fileContentView = NSView()
     private var sidebarWidthConstraint: NSLayoutConstraint?
-    private var transferProgressPanel = FileTransferProgressPanel()
     private var countLabel = NSTextField(labelWithString: "0 项")
     private var pathLabel = NSTextField(labelWithString: "未选择文件夹")
     private var levelDotsStack = NSStackView()
@@ -141,12 +140,6 @@ final class SidebarWindowController: NSObject {
         var currentURL: URL
         var stack: [URL]
         var expandedListPaths: Set<String>
-    }
-
-    private struct FileImportTask {
-        let source: URL
-        let destination: URL
-        let operation: FileImportOperation
     }
 
     override init() {
@@ -2048,227 +2041,32 @@ final class SidebarWindowController: NSObject {
     @discardableResult
     private func importFiles(_ urls: [URL], to folderURL: URL?, operation: FileImportOperation = .copy) -> Bool {
         guard let folderURL else { return false }
-        let tasks = urls.compactMap { source -> FileImportTask? in
-            guard source.deletingLastPathComponent() != folderURL else { return nil }
-            guard let destination = resolvedImportDestination(for: source, in: folderURL) else { return nil }
-            return FileImportTask(source: source, destination: destination, operation: operation)
-        }
-
-        guard !tasks.isEmpty else { return false }
-        startImportTasks(tasks, operation: operation)
+        let sources = urls.filter { $0.deletingLastPathComponent() != folderURL }
+        guard !sources.isEmpty else { return false }
+        startImportTasks(sources, to: folderURL, operation: operation)
         return true
     }
 
-    private func startImportTasks(_ tasks: [FileImportTask], operation: FileImportOperation) {
-        let title = operation == .move ? "正在移动" : "正在复制"
-        transferProgressPanel.show(
-            on: panel.screen ?? screenContainingMouse(),
-            title: title,
-            detail: tasks.count == 1 ? tasks[0].source.lastPathComponent : "\(tasks.count) 个项目"
-        )
-
+    private func startImportTasks(_ sources: [URL], to destination: URL, operation: FileImportOperation) {
         transferQueue.async { [weak self] in
             guard let self else { return }
             do {
-                let totalBytes = tasks.reduce(UInt64(0)) { partial, task in
-                    partial + self.transferSize(of: task.source)
-                }
-                var completedBytes: UInt64 = 0
-
-                for task in tasks {
-                    DispatchQueue.main.async {
-                        self.transferProgressPanel.update(
-                            title: title,
-                            detail: task.source.lastPathComponent,
-                            completed: completedBytes,
-                            total: totalBytes
-                        )
-                    }
-
-                    switch task.operation {
-                    case .copy:
-                        try self.copyItemWithProgress(
-                            from: task.source,
-                            to: task.destination,
-                            completedBytes: &completedBytes,
-                            totalBytes: totalBytes,
-                            title: title
-                        )
-                    case .move:
-                        let size = self.transferSize(of: task.source)
-                        try FileManager.default.moveItem(at: task.source, to: task.destination)
-                        completedBytes += size
-                        DispatchQueue.main.async {
-                            self.transferProgressPanel.update(
-                                title: title,
-                                detail: task.source.lastPathComponent,
-                                completed: completedBytes,
-                                total: totalBytes
-                            )
-                        }
-                    }
-                }
+                try FinderFileTransfer.perform(
+                    sources: sources,
+                    to: destination,
+                    operation: operation
+                )
 
                 DispatchQueue.main.async {
-                    self.transferProgressPanel.finish(title: "完成", detail: "\(tasks.count) 个项目已处理")
                     // A drop can change a cached, expanded subfolder in the list.
                     self.refreshFiles()
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.transferProgressPanel.finish(title: operation == .move ? "移动失败" : "复制失败", detail: error.localizedDescription)
                     self.showAlert(title: operation == .move ? "移动失败" : "复制失败", message: error.localizedDescription)
                     self.refreshFiles()
                 }
             }
-        }
-    }
-
-    private func transferSize(of url: URL) -> UInt64 {
-        let keys: Set<URLResourceKey> = [.isDirectoryKey, .fileSizeKey, .totalFileAllocatedSizeKey]
-        guard let values = try? url.resourceValues(forKeys: keys) else { return 0 }
-        if values.isDirectory == true {
-            guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles]) else {
-                return 0
-            }
-            return enumerator.compactMap { item -> UInt64? in
-                guard let fileURL = item as? URL,
-                      let itemValues = try? fileURL.resourceValues(forKeys: keys),
-                      itemValues.isDirectory != true else { return nil }
-                return UInt64(itemValues.totalFileAllocatedSize ?? itemValues.fileSize ?? 0)
-            }.reduce(0, +)
-        }
-        return UInt64(values.totalFileAllocatedSize ?? values.fileSize ?? 0)
-    }
-
-    private func copyItemWithProgress(
-        from source: URL,
-        to destination: URL,
-        completedBytes: inout UInt64,
-        totalBytes: UInt64,
-        title: String
-    ) throws {
-        let values = try source.resourceValues(forKeys: [.isDirectoryKey])
-        if values.isDirectory == true {
-            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-            guard let enumerator = FileManager.default.enumerator(
-                at: source,
-                includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey],
-                options: []
-            ) else { return }
-
-            for case let itemURL as URL in enumerator {
-                let relativePath = String(itemURL.path.dropFirst(source.path.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                guard !relativePath.isEmpty else { continue }
-                let itemDestination = destination.appendingPathComponent(relativePath)
-                let itemValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey])
-                if itemValues.isDirectory == true {
-                    try FileManager.default.createDirectory(at: itemDestination, withIntermediateDirectories: true)
-                } else {
-                    try copyFileWithProgress(
-                        from: itemURL,
-                        to: itemDestination,
-                        completedBytes: &completedBytes,
-                        totalBytes: totalBytes,
-                        title: title
-                    )
-                }
-            }
-            return
-        }
-
-        try copyFileWithProgress(
-            from: source,
-            to: destination,
-            completedBytes: &completedBytes,
-            totalBytes: totalBytes,
-            title: title
-        )
-    }
-
-    private func copyFileWithProgress(
-        from source: URL,
-        to destination: URL,
-        completedBytes: inout UInt64,
-        totalBytes: UInt64,
-        title: String
-    ) throws {
-        try FileManager.default.createDirectory(
-            at: destination.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        FileManager.default.createFile(atPath: destination.path, contents: nil)
-
-        let input = try FileHandle(forReadingFrom: source)
-        defer { try? input.close() }
-
-        let output = try FileHandle(forWritingTo: destination)
-        defer { try? output.close() }
-
-        let chunkSize = 1024 * 1024
-        var lastUpdate = Date(timeIntervalSince1970: 0)
-
-        while autoreleasepool(invoking: {
-            let data = input.readData(ofLength: chunkSize)
-            guard !data.isEmpty else { return false }
-            output.write(data)
-            completedBytes += UInt64(data.count)
-
-            let now = Date()
-            if now.timeIntervalSince(lastUpdate) > 0.08 {
-                lastUpdate = now
-                let currentCompleted = completedBytes
-                DispatchQueue.main.async {
-                    self.transferProgressPanel.update(
-                        title: title,
-                        detail: source.lastPathComponent,
-                        completed: currentCompleted,
-                        total: totalBytes
-                    )
-                }
-            }
-            return true
-        }) {}
-    }
-
-    private enum DuplicateChoice {
-        case replace
-        case keepBoth
-        case skip
-    }
-
-    private func resolvedImportDestination(for source: URL, in folder: URL) -> URL? {
-        let destination = folder.appendingPathComponent(source.lastPathComponent)
-        guard FileManager.default.fileExists(atPath: destination.path) else {
-            return destination
-        }
-
-        switch askDuplicateChoice(fileName: source.lastPathComponent) {
-        case .replace:
-            try? FileManager.default.trashItem(at: destination, resultingItemURL: nil)
-            return destination
-        case .keepBoth:
-            return uniqueDestination(for: source.lastPathComponent, in: folder)
-        case .skip:
-            return nil
-        }
-    }
-
-    private func askDuplicateChoice(fileName: String) -> DuplicateChoice {
-        let alert = NSAlert()
-        alert.messageText = "已存在同名项目"
-        alert.informativeText = "“\(fileName)”已经存在于当前文件夹中。"
-        alert.addButton(withTitle: "替换")
-        alert.addButton(withTitle: "保留两者")
-        alert.addButton(withTitle: "跳过")
-
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
-            return .replace
-        case .alertSecondButtonReturn:
-            return .keepBoth
-        default:
-            return .skip
         }
     }
 

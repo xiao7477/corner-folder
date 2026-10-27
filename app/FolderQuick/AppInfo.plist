@@ -26,6 +26,8 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>FolderQuick 使用 Finder 执行拖入的文件复制和移动，并显示 Finder 的传输进度与取消界面。</string>
 	<key>SUFeedURL</key>
 	<string>https://github.com/xiao7477/corner-folder/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>

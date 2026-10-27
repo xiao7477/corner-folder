@@ -57,6 +57,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <string>$APP_MIN_MACOS_VERSION</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>FolderQuick 使用 Finder 执行拖入的文件复制和移动，并显示 Finder 的传输进度与取消界面。</string>
   <key>SUFeedURL</key>
   <string>$UPDATE_FEED_URL</string>
   <key>SUPublicEDKey</key>
